@@ -1,0 +1,3013 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mbmd → HTML 转换器 · MarkBottom 0.1</title>
+<style>
+  :root { --bg:#1e1f22; --fg:#e6e6e6; --dim:#9aa0a6; --line:#3a3d42; --acc:#4c9ffe; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; background: var(--bg); color: var(--fg);
+         font: 14px/1.7 -apple-system, "Segoe UI", "Noto Sans SC", Meiryo, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center;
+           padding: .5rem .75rem; border-bottom: 1px solid var(--line); }
+  header .sp { flex: 1 1 auto; }
+  button, label.btn {
+      font: inherit; padding: .25rem .7rem; border: 1px solid var(--line); border-radius: .35rem;
+      background: #2b2d31; color: var(--fg); cursor: pointer; }
+  button:hover, label.btn:hover { background: #35383d; }
+  button.on { border-color: var(--acc); color: var(--acc); }
+  input[type=file] { display: none; }
+  main { flex: 1 1 auto; display: flex; min-height: 0; }
+  .pane { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; }
+  .pane + .pane { border-left: 1px solid var(--line); }
+  .pane h2 { margin: 0; padding: .3rem .75rem; font-size: .8rem; font-weight: 400;
+             color: var(--dim); border-bottom: 1px solid var(--line); }
+  textarea { flex: 1 1 auto; width: 100%; resize: none; border: 0; outline: none;
+             padding: .75rem; background: #26282c; color: var(--fg);
+             font: 13px/1.6 "SF Mono", Consolas, "Noto Sans Mono CJK SC", monospace; }
+  iframe { flex: 1 1 auto; width: 100%; border: 0; background: #fff; }
+  .srcbox { flex: 1 1 auto; overflow: auto; display: none; }
+  .srcbox pre { margin: 0; padding: .75rem; white-space: pre-wrap; word-break: break-all;
+                font: 12px/1.6 "SF Mono", Consolas, monospace; color: #cfd3d8; }
+  #log { max-height: 7em; overflow: auto; padding: .3rem .75rem; font-size: 12px;
+         color: #ffcf7f; border-top: 1px solid var(--line); }
+  #log:empty { display: none; }
+  .hint { color: var(--dim); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <strong>mbmd&nbsp;→&nbsp;HTML</strong>
+  <span class="hint" id="ver"></span>
+  <label class="btn">打开 .mbmd<input type="file" id="file" accept=".mbmd,.mbmd.md,.md,.txt"></label>
+  <button id="demo">载入示例</button>
+  <button id="clear">清空</button>
+  <span class="sp"></span>
+  <button id="viewPreview" class="on">预览</button>
+  <button id="viewSource">HTML 源码</button>
+  <button id="copy">复制 HTML</button>
+  <button id="download">下载 .html</button>
+</header>
+
+<main>
+  <section class="pane">
+    <h2>mbmd 源文件（可直接拖进来）</h2>
+    <textarea id="in" spellcheck="false" placeholder="在这里写 mbmd，或把 .mbmd 文件拖进这个窗口……"></textarea>
+  </section>
+  <section class="pane">
+    <h2 id="outTitle">预览</h2>
+    <iframe id="out" title="预览"></iframe>
+    <div class="srcbox" id="srcbox"><pre id="srccode"></pre></div>
+  </section>
+</main>
+
+<div id="log"></div>
+
+<!-- ============================================================
+     标准 CSS（第 1 节「必要的样式定义」+ 文档基础排版）
+     ============================================================ -->
+<script type="text/plain" id="stdCss">
+/* ===== 1. 必要的样式定义 ===== */
+.mb-ruby-under { ruby-position: under; }
+.mb-ruby-over  { ruby-position: over; }
+.mb-bigger { font-size: 150%; }
+.mb-smaller { font-size: 75%; }
+.mb-gray { opacity: 0.75; }
+.mb-commental { opacity: 0.75; font-size: 75%; }
+.mb-commental::before { opacity: 0.75; font-size: 75%; content: "("; }
+.mb-commental::after  { opacity: 0.75; font-size: 75%; content: ")"; }
+.mb-blacked { color: #444; background-color: #444; }
+.mb-blacked:hover { color: #eee; }
+.mb-fgcolored { color: var(--mbhighlightcolor, #26d); }
+.mb-bgcolored { background-color: var(--mbhighlightbgcolor, #ed6d); }
+.mb-bgpartialcolored {
+    background-image: linear-gradient(var(--mbhighlightbgcolor, #ed6d), var(--mbhighlightbgcolor, #ed6d));
+    background-repeat: no-repeat;
+    background-size: 100% 0.5em;
+    background-position: 0 calc(100% - 0em);
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+}
+
+/* ===== 1.1 新增语法所需的样式（必需） ===== */
+.mb-left   { text-align: left; }
+.mb-center { text-align: center; }
+.mb-right  { text-align: right; }
+.mb-block  { display: block; }
+.mb-float-right { float: right; clear: right; margin: 0 0 0.5em 0.5em; }
+.mb-float-left  { float: left;  clear: left;  margin: 0 0.5em 0.5em 0; }
+.mb-inline-middle { display: inline-block; vertical-align: middle; }
+
+.mb-vertical   { writing-mode: vertical-rl; display: inline-block; vertical-align: top; }
+.mb-horizontal { writing-mode: horizontal-tb; }
+
+.mb-origin { white-space: pre-wrap; }
+
+.mb-btn {
+    display: inline-block; padding: 0.1em 0.8em; border: 1px solid #aaa;
+    border-radius: 0.35em; background: #f4f4f4; color: inherit; font: inherit;
+    line-height: 1.6; text-decoration: none; cursor: pointer;
+}
+.mb-btn:hover  { background: #e9e9e9; }
+.mb-btn:active { background: #dedede; }
+
+.mb-input { font: inherit; padding: 0.1em 0.4em; border: 1px solid #aaa;
+            border-radius: 0.25em; background: #fff; color: inherit; }
+
+.mb-label { display: inline-flex; align-items: center; gap: 0.3em; cursor: pointer; }
+
+.mb-fold > summary { cursor: pointer; }
+
+.mb-fold-inline { display: inline; }
+.mb-fold-inline > .mb-fold-state {
+    position: absolute; width: 0; height: 0; margin: 0; opacity: 0; pointer-events: none;
+}
+.mb-fold-inline > .mb-fold-body,
+.mb-fold-inline > .mb-fold-close { display: none; }
+.mb-fold-inline > .mb-fold-state:checked ~ .mb-fold-body,
+.mb-fold-inline > .mb-fold-state:checked ~ .mb-fold-close { display: inline; }
+.mb-fold-inline > .mb-fold-state:checked ~ .mb-fold-title { display: none; }
+.mb-fold-title, .mb-fold-close { cursor: pointer; font: inherit; }
+.mb-fold-title::before { content: "▶ "; }
+
+.mb-fold-block > .mb-fold-state {
+    position: absolute; width: 0; height: 0; margin: 0; opacity: 0; pointer-events: none;
+}
+.mb-fold-block > .mb-fold-body,
+.mb-fold-block > .mb-fold-close { display: none; }
+.mb-fold-block > .mb-fold-state:checked ~ .mb-fold-body { display: block; }
+.mb-fold-block > .mb-fold-state:checked ~ .mb-fold-close { display: block; }
+.mb-fold-block > .mb-fold-state:checked ~ .mb-fold-title { display: none; }
+
+.mb-slash { position: relative; }
+.mb-slash::before {
+    content: ""; position: absolute; inset: 0; background-size: 100% 100%;
+    background-repeat: no-repeat; pointer-events: none;
+}
+.mb-slash-u::before {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><line x1="0" y1="100" x2="100" y2="0" stroke="%23bbb" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>');
+}
+.mb-slash-d::before {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><line x1="0" y1="0" x2="100" y2="100" stroke="%23bbb" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>');
+}
+.mb-slash > .mb-slash-head,
+.mb-slash > .mb-slash-mid,
+.mb-slash > .mb-slash-tail {
+    position: absolute; font-size: 75%; line-height: 1.2; white-space: nowrap;
+}
+.mb-slash-fan {
+    position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;
+}
+.mb-slash-fan line { stroke: #bbb; stroke-width: 1; vector-effect: non-scaling-stroke; }
+
+.mb-chart { margin: 0.5em 0; }
+.mb-chart-bar { display: flex; align-items: flex-end; gap: 0.25em; height: 8em; }
+.mb-chart-bar .mb-bar {
+    flex: 1 1 0; height: calc(var(--mb-v) / var(--mb-max) * 100%);
+    background: var(--mbhighlightbgcolor, #ed6d);
+    border-radius: 0.15em 0.15em 0 0; text-align: center; font-size: 75%;
+}
+.mb-chart-pie { width: 8em; height: 8em; }
+
+/* 折叠块放在表格里时，被折叠的行 */
+tr[hidden] { display: none; }
+[data-mb-fold][hidden] { display: none; }
+/* ↑ 但表格里【不要】真的把行 display:none 掉：被隐藏的行不再占位，跨行的 rowspan 就会
+   把后面的行整片挤歪（表看起来散架）。表格里的折叠一律用 .mb-fold-off：
+   行留在表格里（rowspan 永远有效），只把那一行的内容与内边距收掉。 */
+/* 列表项 / 普通块：被折叠就直接藏起来 */
+[data-mb-fold].mb-fold-off:not(tr) { display: none; }
+tr.mb-fold-off > th, tr.mb-fold-off > td {
+    visibility: hidden; font-size: 0; line-height: 0;
+    padding: 0; border: 0; height: 0;
+}
+tr.mb-fold-off > th > *, tr.mb-fold-off > td > * { display: none; }
+
+/* ===== 媒体（图片 / 视频 / 音频） ===== */
+.mb-media, .mb-media-cover > img { max-width: 100%; }
+.mb-media-cover { display: inline-block; }
+.mb-media-cover > img { display: block; margin-bottom: 0.3em; }
+body.mb-doc video, body.mb-doc audio { max-width: 100%; }
+
+/* ===== 文档基础排版 ===== */
+body.mb-doc {
+    margin: 0 auto; padding: 2rem 1.25rem 4rem; max-width: 48rem;
+    background: #fff; color: #24292f;
+    font: 16px/1.8 -apple-system, "Segoe UI", "Noto Sans SC", Meiryo, sans-serif;
+    word-wrap: break-word;
+}
+body.mb-doc h1, body.mb-doc h2, body.mb-doc h3,
+body.mb-doc h4, body.mb-doc h5, body.mb-doc h6 { line-height: 1.35; margin: 1.6em 0 .6em; }
+body.mb-doc h1 { font-size: 1.9em; border-bottom: 1px solid #e5e5e5; padding-bottom: .25em; }
+body.mb-doc h2 { font-size: 1.5em; border-bottom: 1px solid #eee; padding-bottom: .2em; }
+body.mb-doc h3 { font-size: 1.25em; }
+body.mb-doc a { color: #0969da; }
+body.mb-doc blockquote { margin: 1em 0; padding: .1em 1em; color: #57606a;
+                         border-left: .25em solid #d0d7de; }
+body.mb-doc hr { height: 1px; border: 0; background: #d8dee4; margin: 2em 0; }
+body.mb-doc code { font-family: "SF Mono", Consolas, "Noto Sans Mono CJK SC", monospace;
+                   font-size: .9em; background: #f2f3f5; padding: .15em .35em; border-radius: .25em; }
+body.mb-doc pre { background: #f6f8fa; padding: .75em 1em; border-radius: .375em; overflow: auto; }
+body.mb-doc pre code { background: none; padding: 0; }
+body.mb-doc table { border-collapse: collapse; margin: 1em 0;
+                    /* 表格宽过屏幕时能左右滑动 */
+                    display: block; overflow-x: auto; max-width: 100%; }
+body.mb-doc th, body.mb-doc td { border: 1px solid #d0d7de; padding: .35em .6em; vertical-align: top; }
+body.mb-doc thead th, body.mb-doc th[scope=row] { background: #f2f3f5; }
+body.mb-doc img { max-width: 100%; }
+body.mb-doc dl { margin: 1em 0; }
+body.mb-doc dt { font-weight: 600; }
+body.mb-doc dd { margin: 0 0 .4em 1.5em; }
+body.mb-doc .mb-footnotes { margin-top: 3em; padding-top: .75em; border-top: 1px solid #e5e5e5;
+                            font-size: .9em; color: #57606a; }
+body.mb-doc .mb-exec:empty { display: none; }
+body.mb-doc .mb-exec:empty + br { display: none; }
+</script>
+
+<!-- ============================================================
+     参考运行时（标准附录 A + 折叠表格行）
+     ============================================================ -->
+<script type="text/plain" id="stdJs">
+/* mb.js —— MarkBottom 0.1 参考运行时 */
+(function () {
+  'use strict';
+  var GLOBAL = Object.create(null);
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function tick() {
+    var d = new Date();
+    GLOBAL.timeh = pad(d.getHours());
+    GLOBAL.timem = pad(d.getMinutes());
+    GLOBAL.times = pad(d.getSeconds());
+    GLOBAL.timeY = String(d.getFullYear());
+    GLOBAL.timeM = pad(d.getMonth() + 1);
+    GLOBAL.timeD = pad(d.getDate());
+  }
+  tick();
+  GLOBAL.browser = navigator.userAgent;
+  GLOBAL.os = navigator.platform ||
+    (navigator.userAgentData ? navigator.userAgentData.platform : '');
+
+  var TOKEN_RE = new RegExp(
+    '\\s*(' +
+      '\\d+(?:\\.\\d+)?' +
+      '|"(?:[^"\\\\]|\\\\.)*"' +
+      '|\\$[A-Za-z_][A-Za-z0-9_]*\\$' +
+      '|\\+:|\\-:|%:|>:' +
+      '|\\+\\+|--|\\+=|-=|\\*=|\/=' +
+      '|>=|<=|==|!=' +
+      '|\\.-|\\.\\+|\\.\\?' +
+      '|[+\\-*/%()\\[\\],=!|&<>?:]' +
+    ')', 'y');
+
+  function tokenize(src) {
+    var out = [], i = 0, m;
+    while (i < src.length) {
+      if (/\s/.test(src[i])) { i++; continue; }
+      TOKEN_RE.lastIndex = i;
+      m = TOKEN_RE.exec(src);
+      if (!m) throw new SyntaxError('非法字符：' + src[i]);
+      out.push(m[1]);
+      i = TOKEN_RE.lastIndex;
+    }
+    return out;
+  }
+  function truthy(v) {
+    return !(v === '' || v === 0 || v === '0' || v === false || v === null || v === undefined);
+  }
+  function evaluate(src, scope) {
+    var toks = tokenize(src), p = 0;
+    var peek = function () { return toks[p]; };
+    var eat = function (t) { if (toks[p] === t) { p++; return true; } return false; };
+    var expect = function (t) { if (!eat(t)) throw new SyntaxError('期望 “' + t + '”'); };
+    var getVar = function (n) {
+      if (n === 'cntnt') return scope.cntnt === undefined ? '' : scope.cntnt;
+      if (n in scope) return scope[n];
+      if (n in GLOBAL) return GLOBAL[n];
+      return '';
+    };
+    var setVar = function (n, v) { if (n === 'cntnt') scope.cntnt = v; else scope[n] = v; return v; };
+    function conditional() {
+      var c = assignment();
+      if (eat('?')) { var a = conditional(); expect(':'); var b = conditional(); return truthy(c) ? a : b; }
+      return c;
+    }
+    function assignment() {
+      var t = peek();
+      if (t && t.charAt(0) === '$') {
+        var name = t.slice(1, -1), op = toks[p + 1];
+        if (op === '=' || op === '+=' || op === '-=' || op === '*=' || op === '/=') {
+          p += 2;
+          var old = getVar(name), rhs = assignment();
+          if (op === '=')  return setVar(name, rhs);
+          if (op === '+=') return setVar(name, Number(old) + Number(rhs));
+          if (op === '-=') return setVar(name, Number(old) - Number(rhs));
+          if (op === '*=') return setVar(name, Number(old) * Number(rhs));
+          return setVar(name, Number(old) / Number(rhs));
+        }
+        if (op === '++' || op === '--') {
+          p += 2; var v0 = Number(getVar(name));
+          setVar(name, op === '++' ? v0 + 1 : v0 - 1); return v0;
+        }
+      }
+      return or();
+    }
+    function or()  { var v = and(); while (eat('|')) { var r = and(); v = truthy(v) || truthy(r); } return v; }
+    function and() { var v = equ(); while (eat('&')) { var r = equ(); v = truthy(v) && truthy(r); } return v; }
+    function equ() {
+      var v = rel();
+      for (;;) { if (eat('==')) v = (v == rel()); else if (eat('!=')) v = (v != rel()); else return v; }
+    }
+    function rel() {
+      var v = strOps();
+      for (;;) {
+        if (eat('>=')) v = (v >= strOps());
+        else if (eat('<=')) v = (v <= strOps());
+        else if (eat('>')) v = (v > strOps());
+        else if (eat('<')) v = (v < strOps());
+        else return v;
+      }
+    }
+    function strOps() {
+      var v = add();
+      for (;;) {
+        if (eat('+:')) { v = String(v) + String(add()); }
+        else if (eat('-:')) { v = String(v).split(String(add())).join(''); }
+        else if (eat('%:')) {
+          var oldS = add();
+          if (!eat('>:')) throw new SyntaxError('“%:” 必须与 “>:” 配对');
+          v = String(v).split(String(oldS)).join(String(add()));
+        } else return v;
+      }
+    }
+    function add() {
+      var v = mul();
+      for (;;) {
+        if (eat('+')) v = Number(v) + Number(mul());
+        else if (eat('-')) v = Number(v) - Number(mul());
+        else return v;
+      }
+    }
+    function mul() {
+      var v = unary();
+      for (;;) {
+        if (eat('*')) v = Number(v) * Number(unary());
+        else if (eat('/')) v = Number(v) / Number(unary());
+        else if (eat('%')) v = Number(v) % Number(unary());
+        else return v;
+      }
+    }
+    function unary() {
+      if (eat('!')) return !truthy(unary());
+      if (eat('-')) return -Number(unary());
+      if (eat('+')) return Number(unary());
+      return postfix();
+    }
+    function postfix() {
+      var v = primary();
+      for (;;) {
+        if (eat('[')) { var n = conditional(); expect(']'); v = String(v).charAt(Number(n) - 1); }
+        else if (eat('.-')) v = Math.floor(Number(v));
+        else if (eat('.+')) v = Math.ceil(Number(v));
+        else if (eat('.?')) v = Math.round(Number(v));
+        else return v;
+      }
+    }
+    function primary() {
+      var t = peek();
+      if (t === undefined) throw new SyntaxError('表达式意外结束');
+      if (/^\d/.test(t)) { p++; return parseFloat(t); }
+      if (t.charAt(0) === '"') { p++; return JSON.parse(t); }
+      if (t.charAt(0) === '$') { p++; return getVar(t.slice(1, -1)); }
+      if (eat('(')) { var v = conditional(); expect(')'); return v; }
+      throw new SyntaxError('无法解析：“' + t + '”');
+    }
+    var value = conditional();
+    if (p !== toks.length) throw new SyntaxError('表达式未完全解析');
+    return value;
+  }
+
+  function splitCalls(inner) {
+    var calls = [], i = 0;
+    while (i < inner.length) {
+      if (inner.charAt(i) !== '{') { i++; continue; }
+      var depth = 1, j = i + 1, inStr = false;
+      while (j < inner.length && depth > 0) {
+        var c = inner.charAt(j);
+        if (inStr) { if (c === '\\') j++; else if (c === '"') inStr = false; }
+        else if (c === '"') inStr = true;
+        else if (c === '{') depth++;
+        else if (c === '}') depth--;
+        j++;
+      }
+      calls.push(inner.slice(i + 1, j - 1));
+      i = j;
+    }
+    return calls;
+  }
+
+  // 文档级共享的变量：赋值语句（{`$a=1`}）写下的变量，别的语句、触发器都能用
+  var DOC_SCOPE = Object.create(null);
+  // trigger 记下来的“后面那串功能语句”：flag → { units: [...], anchor: 元素 }
+  var TRIGGERS = Object.create(null);
+  // call / use 比 trigger 先跑到时，先在这里排队，等页面加载完再补跑
+  var PENDING = [];
+  // 运行时做过的动作（转换器会把这份日志抓去显示，方便排查）
+  var MB_LOG = [];
+  function LOG(s) {
+    MB_LOG.push(s);
+    if (window.console && console.info) console.info('[mb] ' + s);
+  }
+
+  /* ---- 行内重解析：put / rplc 插进去的文本要当成 mb 文本再解析一遍 ----
+     只做行内语法，而且【不】再执行 {{…}} / {$…$} / {`…`} 这类功能语句（免得重复执行）。 */
+  var MB_ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+  function mbEsc(s) { return String(s).replace(/[&<>"]/g, function (c) { return MB_ESC[c]; }); }
+  function rubyLite(inner) {
+    var bar = -1, slash = -1, depth = 0, j;
+    for (j = 0; j < inner.length; j++) {
+      var cc = inner[j];
+      if (cc === '【') { depth++; continue; }
+      if (cc === '】') { depth--; continue; }
+      if (depth > 0) continue;
+      if ((cc === '|' || cc === '｜') && bar < 0 && slash < 0) bar = j;
+      else if ((cc === '/' || cc === '／') && slash < 0 && bar < 0) slash = j;
+    }
+    var i0 = bar >= 0 ? bar : slash, up = '', down = '';
+    if (i0 < 0) return '<ruby>' + mbEsc(inner) + '</ruby>';
+    var base = inner.slice(0, i0), after = inner.slice(i0 + 1);
+    if (bar >= 0) {
+      var s2 = after.indexOf('/');
+      if (s2 < 0) s2 = after.indexOf('／');
+      if (s2 >= 0) { up = after.slice(0, s2); down = after.slice(s2 + 1); } else up = after;
+    } else down = after;
+    var markU = '<rp>(</rp><rt>' + mbEsc(up) + '</rt><rp>)</rp>';
+    var markD = '<rp>(</rp><rt>' + mbEsc(down) + '</rt><rp>)</rp>';
+    if (up && down) {
+      return '<ruby class="mb-ruby-under"><ruby class="mb-ruby-over">' + mbEsc(base) + markU
+           + '</ruby>' + markD + '</ruby>';
+    }
+    if (down) return '<ruby class="mb-ruby-under">' + mbEsc(base) + markD + '</ruby>';
+    return '<ruby>' + mbEsc(base) + markU + '</ruby>';
+  }
+  function mbInline(s) {
+    var out = '', i = 0, n = s.length;
+    function plain(ch) { out += mbEsc(ch); }
+    while (i < n) {
+      var c = s[i], e, t = null;
+      if (c === '\\') {
+        var nx = s[i + 1];
+        if (nx === 'o' && s[i + 2] !== undefined) { plain(s[i + 2]); i += 3; continue; }
+        if (nx === undefined) { plain('\\'); i++; continue; }
+        var named = { n: '<br>', t: '\t', '<': '&lt;', '>': '&gt;', '&': '&amp;', '\\': '\\' };
+        out += (named[nx] !== undefined ? named[nx] : mbEsc(nx));
+        i += 2; continue;
+      }
+      if (s.startsWith('{{', i) || s.startsWith('{$', i) || s.startsWith('{`', i)) {
+        plain(c); i++; continue;                       // 功能语句不在运行时再执行
+      }
+      if (c === '`') {
+        e = s.indexOf('`', i + 1);
+        if (e > 0) { out += '<code>' + mbEsc(s.slice(i + 1, e)) + '</code>'; i = e + 1; continue; }
+      }
+      if (s.startsWith('**', i)) t = { o: '**', c: '**', tag: 'strong' };
+      else if (s.startsWith('__', i)) t = { o: '__', c: '__', tag: 'strong' };
+      else if (s.startsWith('~~', i)) t = { o: '~~', c: '~~', tag: 'del' };
+      else if (s.startsWith('<-[', i)) t = { o: '<-[', c: ']->', cls: 'mb-bigger' };
+      else if (s.startsWith('->[', i)) t = { o: '->[', c: ']<-', cls: 'mb-smaller' };
+      else if (s.startsWith('^[', i)) t = { o: '^[', c: ']^', tag: 'sup' };
+      else if (s.startsWith('_[', i)) t = { o: '_[', c: ']_', tag: 'sub' };
+      else if (s.startsWith('_(', i)) t = { o: '_(', c: ')_', cls: 'mb-commental' };
+      else if (s.startsWith('@(', i)) t = { o: '@(', c: ')@', cls: 'mb-gray' };
+      else if (s.startsWith('#(', i)) t = { o: '#(', c: ')#', cls: 'mb-blacked' };
+      else if (s.startsWith("!'", i)) t = { o: "!'", c: "'!", cls: 'mb-fgcolored' };
+      else if (s.startsWith('!,', i)) t = { o: '!,', c: ',!', cls: 'mb-bgcolored' };
+      else if (s.startsWith('!.', i)) t = { o: '!.', c: '.!', cls: 'mb-bgpartialcolored' };
+      else if (s.startsWith('!;', i)) t = { o: '!;', c: ';!', cls: 'mb-fgcolored mb-bgcolored' };
+      else if (s.startsWith('!:', i)) t = { o: '!:', c: ':!', cls: 'mb-fgcolored mb-bgpartialcolored' };
+      else if (s.startsWith('[|[', i)) t = { o: '[|[', c: ']|]', cls: 'mb-vertical' };
+      else if (c === '【') t = { o: '【', c: '】', ruby: true };
+      else if (c === '*') t = { o: '*', c: '*', tag: 'em' };
+      else if (c === '_') t = { o: '_', c: '_', tag: 'u' };
+      if (t) {
+        e = s.indexOf(t.c, i + t.o.length);
+        if (e >= 0) {
+          var inner2 = s.slice(i + t.o.length, e);
+          if (t.ruby) out += rubyLite(inner2);
+          else if (t.tag) out += '<' + t.tag + '>' + mbInline(inner2) + '</' + t.tag + '>';
+          else out += '<span class="' + t.cls + '">' + mbInline(inner2) + '</span>';
+          i = e + t.c.length; continue;
+        }
+      }
+      if (c === '<') {
+        var hm = /^<\/?[a-zA-Z][\w-]*(\s[^<>]*)?\/?>/.exec(s.slice(i));
+        if (hm) { out += hm[0]; i += hm[0].length; continue; }
+      }
+      if (c === '&') {
+        var ent = /^&[#a-zA-Z0-9]+;/.exec(s.slice(i));
+        if (ent) { out += ent[0]; i += ent[0].length; continue; }
+      }
+      plain(c); i++;
+    }
+    return out;
+  }
+  /* 把插入的文本按 mb 再解析一遍：与紧邻的文本节点合成一段再解析 */
+  function reparseText(node) {
+    try { reparseTextInner(node); }
+    catch (e) { LOG('再解析插入的文本时出错：' + e.message); }
+  }
+  function reparseTextInner(node) {
+    if (!node || node.nodeType !== 3 || !node.parentNode) return;
+    var p = node.parentNode, start = node, end = node, n;
+    while (start.previousSibling && start.previousSibling.nodeType === 3) start = start.previousSibling;
+    while (end.nextSibling && end.nextSibling.nodeType === 3) end = end.nextSibling;
+    var text = '';
+    for (n = start; n; n = n.nextSibling) { text += n.data; if (n === end) break; }
+    var tmp = document.createElement('div');
+    tmp.innerHTML = mbInline(text);
+    var ref = end.nextSibling;
+    for (n = start; n && n !== ref;) { var nx2 = n.nextSibling; p.removeChild(n); n = nx2; }
+    while (tmp.firstChild) p.insertBefore(tmp.firstChild, ref);
+  }
+  function insertAfter(anchor, text) {
+    if (!anchor || !anchor.parentNode) { LOG('put / rplc 的锚点已经不在页面里了'); return null; }
+    var node = document.createTextNode(text);
+    if (anchor.nextSibling) anchor.parentNode.insertBefore(node, anchor.nextSibling);
+    else anchor.parentNode.appendChild(node);
+    reparseText(node);
+    return node;
+  }
+  /* 找最近的一个带某个函数的锚点（不看执行顺序，只看文档位置） */
+  function nearestAnchor(node, word, dir) {
+    var list = document.querySelectorAll('[data-mb*="' + word + '"]'), best = null;
+    Array.prototype.forEach.call(list, function (el) {
+      if (el === node || !node.compareDocumentPosition) return;
+      var pos = node.compareDocumentPosition(el);
+      if (dir < 0) {
+        if (!(pos & Node.DOCUMENT_POSITION_PRECEDING)) return;
+        if (!best || (best.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) best = el;
+      } else {
+        if (!(pos & Node.DOCUMENT_POSITION_FOLLOWING)) return;
+        if (!best || (el.compareDocumentPosition(best) & Node.DOCUMENT_POSITION_FOLLOWING)) best = el;
+      }
+    });
+    return best;
+  }
+  function execOne(name, arg, anchor, scope) {
+    var val = function () { return arg === undefined ? '' : evaluate(arg, scope); };
+    switch (name) {
+      case 'v': case 'l': break;
+      case 't': document.title = String(val()); break;      // 设置页面标题
+      case 'calc': val(); break;                            // 只算不输出（触发器里的运算语句）
+      case 'put': {
+        var pv = String(val());
+        LOG('put：「' + (pv.length > 30 ? pv.slice(0, 30) + '…' : pv) + '」');
+        insertAfter(anchor, pv);
+        break;
+      }
+      case 'rplcStart': case 'rplcEnd':
+        (function () { var m = document.createComment('mb'); anchor.after(m); })();
+        break;
+      case 'rplc': {
+        var s = nearestAnchor(anchor, 'rplcStart', -1), e = nearestAnchor(anchor, 'rplcEnd', +1);
+        if (s && e) {
+          var range = document.createRange();
+          range.setStartAfter(s);
+          range.setEndBefore(e);
+          range.deleteContents();
+          var text = String(val());
+          if (text) { var nd = document.createTextNode(text); range.insertNode(nd); reparseText(nd); }
+          LOG('rplc：已替换成「' + text.slice(0, 30) + '」');
+          [s, e].forEach(function (mk) {
+            var p = mk.parentNode;
+            if (!p) return;
+            p.removeChild(mk);
+            // 标记那一格如果只剩空壳（空段落 + 空 .mb-exec），连它一起收掉，免得留一行空白
+            if (p.tagName === 'P' && !p.textContent.trim() && !p.querySelector('*:not(.mb-exec)')) {
+              p.parentNode.removeChild(p);
+            }
+          });
+        } else { LOG('rplc：找不到配对的 rplcStart / rplcEnd'); }
+        break;
+      }
+      case 'call': case 'use': {
+        var flag = String(val()), rec = TRIGGERS[flag];
+        if (!rec) {
+          // 可能 trigger 排在后面：先排队，init 结尾再补跑一次
+          PENDING.push({ name: name, flag: flag, anchor: anchor, scope: scope });
+          LOG(name + '：还没找到 trigger「' + flag + '」（先排队，等加载完再试）');
+          break;
+        }
+        var at = (name === 'call' && rec.anchor && rec.anchor.parentNode) ? rec.anchor : anchor;
+        LOG(name + '：' + flag + '（执行 ' + rec.units.length + ' 条语句：' + rec.units.join(' / ') + '）');
+        runUnits(rec.units, at, scope);
+        break;
+      }
+      default: LOG('未知函数：' + name + '（语句：' + (arg === undefined ? name : name + ':' + arg) + '）');
+    }
+  }
+  function runOne(call, anchor, scope) {
+    var k = call.indexOf(':');
+    var name = (k < 0 ? call : call.slice(0, k)).trim();
+    var arg = k < 0 ? undefined : call.slice(k + 1);
+    try { execOne(name, arg, anchor, scope); }
+    catch (e) { LOG('× ' + name + ' 执行失败：' + e.message + '（语句：' + call + '）'); }
+  }
+  function runUnits(units, anchor, scope) {
+    units.forEach(function (call) { runOne(call, anchor, scope); });
+  }
+  /* 把 {{a}}{{b}} 这种写法规范成 {{a}{b}}：不然分组数括号时会多出一层（最外层的一对由调用处切掉） */
+  function normalizeScript(s) {
+    return String(s).replace(/\}\}+\{+/g, '}{');
+  }
+  /* 紧跟在这个锚点后面的下一条“单独成行的执行语句”（给 trigger 后面另起一行写语句的情况用） */
+  function nextExec(el) {
+    var list = document.querySelectorAll('.mb-exec[data-mb]'), best = null;
+    Array.prototype.forEach.call(list, function (x) {
+      if (x === el || !el.compareDocumentPosition) return;
+      if (!(el.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING)) return;
+      if (!best || (x.compareDocumentPosition(best) & Node.DOCUMENT_POSITION_PRECEDING)) best = x;
+    });
+    return best;
+  }
+  function runScript(script, anchor, scope) {
+    var units = splitCalls(normalizeScript(script).slice(1, -1));
+    for (var i = 0; i < units.length; i++) {
+      var k = units[i].indexOf(':');
+      var nm = (k < 0 ? units[i] : units[i].slice(0, k)).trim();
+      if (nm === 'trigger') {
+        // trigger 后面（同一组）的语句：先不执行，按 flag 记下来，等 call / use 再跑
+        var flag = k < 0 ? '' : String(evaluate(units[i].slice(k + 1), scope));
+        var rest = units.slice(i + 1);
+        if (!rest.length) {
+          // 同一组里没写：把紧跟其后的那一条执行语句也收进来（但它不能是 call / use / trigger）
+          var nx = nextExec(anchor);
+          if (nx) {
+            var inner2 = normalizeScript(nx.dataset.mb).slice(1, -1);
+            var nm2 = (splitCalls(inner2)[0] || '').split(':')[0].trim();
+            if (nm2 !== 'call' && nm2 !== 'use' && nm2 !== 'trigger') {
+              rest = splitCalls(inner2);
+              nx.removeAttribute('data-mb');       // 已经被 trigger 收走，别再自己执行
+            }
+          }
+        }
+        TRIGGERS[flag] = { units: rest, anchor: anchor };
+        LOG('trigger 已登记：' + flag + '（' + rest.length + ' 条语句：' + rest.join(' / ') + '）');
+        return;
+      }
+      runOne(units[i], anchor, scope);
+    }
+  }
+  /* ---------- 4. 媒体：图片 / 视频 / 音频 ----------
+     类型一律按【文件内容】判断（文件头 magic number 或容器内部的标识），
+     【不看】地址的后缀：
+       图片 PNG·JPEG·GIF·BMP·WebP·TIFF·ICO·AVIF/HEIC·SVG
+       视频 AVI·WebM/MKV（含视频轨）·MP4/MOV/M4V（含视频轨）
+       音频 MP3(ID3)·WAVE·FLAC·Ogg·AIFF·MIDI·ADTS AAC·M4A
+     音频还要把内嵌封面抠出来：ID3v2 的 APIC（MP3，以及 WAV 里非标准的 ID3 块）、
+     FLAC 的 PICTURE 块、Vorbis comment 的 METADATA_BLOCK_PICTURE / COVERART。 */
+  var MEDIA_STEPS = [65536, 262144, 1048576, 4194304, 16777216];
+  var MEDIA_CACHE = Object.create(null);         // url → Promise<{kind, fmt, cover}>
+
+  function at(b, i, s) {
+    if (!b || i + s.length > b.length) return false;
+    for (var k = 0; k < s.length; k++) if (b[i + k] !== s.charCodeAt(k)) return false;
+    return true;
+  }
+  function txt(b, from, len) {
+    var s = '', i, end = Math.min(from + len, b.length);
+    for (i = from; i < end; i++) s += String.fromCharCode(b[i]);
+    return s;
+  }
+  function headStr(b) { return txt(b, 0, Math.min(b.length, 262144)); }
+  function hasAny(b, list) {
+    var s = headStr(b);
+    for (var i = 0; i < list.length; i++) if (s.indexOf(list[i]) >= 0) return true;
+    return false;
+  }
+  function syncsafe(b, i) {
+    return ((b[i] & 0x7f) << 21) | ((b[i + 1] & 0x7f) << 14) | ((b[i + 2] & 0x7f) << 7) | (b[i + 3] & 0x7f);
+  }
+  function le32(b, i) { return (b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24)) >>> 0; }
+  function be32(b, i) { return ((b[i] << 24) | (b[i + 1] << 16) | (b[i + 2] << 8) | b[i + 3]) >>> 0; }
+  function utf8(b, from, len) {
+    var s = '', i = from, end = Math.min(from + len, b.length), c, cp;
+    while (i < end) {
+      c = b[i++];
+      if (c < 0x80) s += String.fromCharCode(c);
+      else if (c < 0xE0) s += String.fromCharCode(((c & 0x1F) << 6) | (b[i++] & 0x3F));
+      else if (c < 0xF0) s += String.fromCharCode(((c & 0x0F) << 12) | ((b[i++] & 0x3F) << 6) | (b[i++] & 0x3F));
+      else {
+        cp = ((c & 0x07) << 18) | ((b[i++] & 0x3F) << 12) | ((b[i++] & 0x3F) << 6) | (b[i++] & 0x3F);
+        cp -= 0x10000;
+        s += String.fromCharCode(0xD800 + (cp >> 10), 0xDC00 + (cp & 0x3FF));
+      }
+    }
+    return s;
+  }
+  function looksLikeSvg(b) {
+    var s = txt(b, 0, Math.min(b.length, 2048)).replace(/^\uFEFF/, '');
+    if (!/^\s*</.test(s)) return false;
+    return /<svg[\s>]/i.test(s);
+  }
+  /* 只看内容判类型 */
+  function probeKind(b) {
+    if (!b || !b.length) return { kind: 'unknown', fmt: '' };
+    if (at(b, 0, '\x89PNG\r\n\x1a\n')) return { kind: 'image', fmt: 'png' };
+    if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return { kind: 'image', fmt: 'jpeg' };
+    if (at(b, 0, 'GIF87a') || at(b, 0, 'GIF89a')) return { kind: 'image', fmt: 'gif' };
+    if (at(b, 0, 'BM')) return { kind: 'image', fmt: 'bmp' };
+    if (at(b, 0, 'II\x2a\x00') || at(b, 0, 'MM\x00\x2a')) return { kind: 'image', fmt: 'tiff' };
+    if (b[0] === 0 && b[1] === 0 && b[2] === 1 && b[3] === 0) return { kind: 'image', fmt: 'ico' };
+    if (at(b, 0, 'RIFF')) {
+      if (at(b, 8, 'WEBP')) return { kind: 'image', fmt: 'webp' };
+      if (at(b, 8, 'WAVE')) return { kind: 'audio', fmt: 'wav' };
+      if (at(b, 8, 'AVI ')) return { kind: 'video', fmt: 'avi' };
+      return { kind: 'unknown', fmt: 'riff' };
+    }
+    if (at(b, 0, 'FORM') && (at(b, 8, 'AIFF') || at(b, 8, 'AIFC'))) return { kind: 'audio', fmt: 'aiff' };
+    if (at(b, 0, 'fLaC')) return { kind: 'audio', fmt: 'flac' };
+    if (at(b, 0, 'OggS')) return { kind: hasAny(b, ['theora']) ? 'video' : 'audio', fmt: 'ogg' };
+    if (at(b, 0, 'MThd')) return { kind: 'audio', fmt: 'midi' };
+    if (at(b, 0, 'ID3')) return { kind: 'audio', fmt: 'mp3' };
+    if (b[0] === 0xFF && (b[1] & 0xF6) === 0xF0) return { kind: 'audio', fmt: 'aac' };
+    if (b[0] === 0xFF && (b[1] & 0xE0) === 0xE0) {
+      var mver = (b[1] >> 3) & 3, mlay = (b[1] >> 1) & 3, mbit = (b[2] >> 4) & 15;
+      if (mver !== 1 && mlay !== 0 && mbit !== 0 && mbit !== 15) return { kind: 'audio', fmt: 'mp3' };
+    }
+    if (b[0] === 0x1A && b[1] === 0x45 && b[2] === 0xDF && b[3] === 0xA3) {
+      if (hasAny(b, ['V_VP8', 'V_VP9', 'V_AV1', 'V_MPEG', 'V_THEORA', 'V_MS'])) return { kind: 'video', fmt: 'webm' };
+      if (hasAny(b, ['A_VORBIS', 'A_OPUS', 'A_AAC', 'A_FLAC', 'A_MPEG', 'A_PCM'])) return { kind: 'audio', fmt: 'webm' };
+      return { kind: 'video', fmt: 'webm' };
+    }
+    if (at(b, 4, 'ftyp')) {
+      var brand = txt(b, 8, 4), hs = headStr(b);
+      if (/^(avif|avis|heic|heix|mif1|msf1)/.test(brand)) return { kind: 'image', fmt: 'heif' };
+      if (/^(M4A|M4B|M4P|F4A|F4B)/.test(brand)) return { kind: 'audio', fmt: 'm4a' };
+      if (hs.indexOf('soun') >= 0 && hs.indexOf('vide') < 0) return { kind: 'audio', fmt: 'm4a' };
+      if (/^(qt {2}|M4V|F4V|MSNV|3gp|3g2)/.test(brand)) return { kind: 'video', fmt: 'mov' };
+      return { kind: 'video', fmt: 'mp4' };
+    }
+    if (looksLikeSvg(b)) return { kind: 'image', fmt: 'svg' };
+    return { kind: 'unknown', fmt: '' };
+  }
+  function sniffMime(d) {
+    if (at(d, 0, '\x89PNG')) return 'image/png';
+    if (d[0] === 0xFF && d[1] === 0xD8) return 'image/jpeg';
+    if (at(d, 0, 'GIF8')) return 'image/gif';
+    if (at(d, 0, 'RIFF') && at(d, 8, 'WEBP')) return 'image/webp';
+    if (at(d, 0, 'BM')) return 'image/bmp';
+    return 'image/jpeg';
+  }
+  /* ID3v2 标签（MP3 的文件头；WAV 里非标准的 ID3 块也是它） */
+  function parseId3Tag(b) {
+    if (!at(b, 0, 'ID3')) return null;
+    var ver = b[3], flags = b[5], size = syncsafe(b, 6);
+    var end = Math.min(10 + size, b.length), body;
+    if (flags & 0x80) body = deUnsync(b, 10, end); else body = b.subarray(10, end);
+    var p = 0;
+    while (p + (ver === 2 ? 6 : 10) <= body.length) {
+      var id, fsize;
+      if (ver === 2) {
+        id = txt(body, p, 3);
+        fsize = (body[p + 3] << 16) | (body[p + 4] << 8) | body[p + 5];
+        p += 6;
+      } else {
+        id = txt(body, p, 4);
+        fsize = ver === 4 ? syncsafe(body, p + 4) : be32(body, p + 4);
+        p += 10;
+      }
+      if (!/^[A-Z0-9]{3,4}$/.test(id) || !fsize) break;
+      if (p + fsize > body.length) fsize = body.length - p;
+      if (id === 'APIC' || id === 'PIC') {
+        var pic = parseApic(body.subarray(p, p + fsize), ver);
+        if (pic) return pic;
+      }
+      p += fsize;
+    }
+    return null;
+  }
+  function deUnsync(b, from, to) {
+    var out = [], i;
+    for (i = from; i < to; i++) { out.push(b[i]); if (b[i] === 0xFF && b[i + 1] === 0x00) i++; }
+    return new Uint8Array(out);
+  }
+  function parseApic(f, ver) {
+    if (f.length < 4) return null;
+    var enc = f[0], q = 1, mime;
+    if (ver === 2) { mime = 'image/' + txt(f, q, 3).toLowerCase().replace('jpg', 'jpeg'); q += 3; }
+    else {
+      var e = q;
+      while (e < f.length && f[e] !== 0) e++;
+      mime = txt(f, q, e - q); q = e + 1;
+    }
+    q++;                                        // 图片类型（1 字节）
+    if (enc === 1 || enc === 2) {               // UTF-16：两字节的终止符
+      while (q + 1 < f.length && !(f[q] === 0 && f[q + 1] === 0)) q += 2;
+      q += 2;
+    } else {
+      while (q < f.length && f[q] !== 0) q++;
+      q++;
+    }
+    if (q >= f.length) return null;
+    var data = f.subarray(q);
+    if (!/^image\//i.test(mime || '')) mime = sniffMime(data);
+    return { mime: mime, data: data };
+  }
+  function parseFlacPicture(b, p, len) {
+    var end = Math.min(p + len, b.length);
+    if (p + 8 > end) return null;
+    p += 4;                                     // 图片类型
+    var ml = be32(b, p); p += 4;
+    if (p + ml > end) return null;
+    var mime = txt(b, p, ml); p += ml;
+    if (p + 4 > end) return null;
+    var dl = be32(b, p); p += 4 + dl;           // 描述
+    if (p + 20 > end) return null;
+    p += 16;                                    // 宽、高、色深、色数
+    var dataLen = be32(b, p); p += 4;
+    var data = b.subarray(p, Math.min(p + dataLen, end));
+    if (!data.length) return null;
+    if (!/^image\//i.test(mime || '')) mime = sniffMime(data);
+    return { mime: mime, data: data };
+  }
+  /* Vorbis comment（FLAC 的元数据块、Ogg 的 comment header 都是它） */
+  function parseVorbisComment(b, p, len) {
+    var end = Math.min(p + len, b.length), out = [], i, l;
+    if (p + 4 > end) return out;
+    l = le32(b, p); p += 4 + l;                 // vendor
+    if (p + 4 > end) return out;
+    var count = le32(b, p); p += 4;
+    for (i = 0; i < count && p + 4 <= end; i++) {
+      l = le32(b, p); p += 4;
+      out.push(utf8(b, p, Math.min(l, end - p)));
+      p += l;
+    }
+    return out;
+  }
+  function b64(s) {
+    var bin = atob(String(s).replace(/\s+/g, '')), out = new Uint8Array(bin.length), i;
+    for (i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i) & 0xFF;
+    return out;
+  }
+  function coverFromComments(list) {
+    var i, m, d;
+    for (i = 0; i < list.length; i++) {                 // 优先 METADATA_BLOCK_PICTURE
+      m = /^METADATA_BLOCK_PICTURE=(.*)$/i.exec(list[i]);
+      if (m) { try { d = b64(m[1]); } catch (e) { d = null; }
+               if (d && d.length) { var pic = parseFlacPicture(d, 0, d.length); if (pic) return pic; } }
+    }
+    for (i = 0; i < list.length; i++) {
+      m = /^COVERART=(.*)$/i.exec(list[i]);
+      if (m) { try { d = b64(m[1]); } catch (e) { d = null; }
+               if (d && d.length) return { mime: sniffMime(d), data: d }; }
+    }
+    return null;
+  }
+  function parseFlac(b) {                       // b 以 fLaC 开头
+    var p = 4, cover = null, comments = null;
+    while (p + 4 <= b.length) {
+      var h = b[p], last = h & 0x80, type = h & 0x7F;
+      var len = (b[p + 1] << 16) | (b[p + 2] << 8) | b[p + 3];
+      var base = p + 4;
+      if (base + len > b.length) return { cover: cover, more: true };   // 还没读全
+      if (type === 6 && !cover) cover = parseFlacPicture(b, base, len);
+      if (type === 4 && !comments) comments = parseVorbisComment(b, base, len);
+      p = base + len;
+      if (last || type === 127) break;
+    }
+    if (!cover && comments) cover = coverFromComments(comments);
+    return { cover: cover };
+  }
+  function joinChunks(chunks) {
+    var n = 0, i, off = 0;
+    for (i = 0; i < chunks.length; i++) n += chunks[i].length;
+    var out = new Uint8Array(n);
+    for (i = 0; i < chunks.length; i++) { out.set(chunks[i], off); off += chunks[i].length; }
+    return out;
+  }
+  function vorbisCommentsIn(packet) {
+    if (packet.length > 7 && at(packet, 0, '\x03vorbis')) return parseVorbisComment(packet, 7, packet.length - 7);
+    if (packet.length > 8 && at(packet, 0, 'OpusTags')) return parseVorbisComment(packet, 8, packet.length - 8);
+    return null;
+  }
+  function parseOgg(b) {                        // Ogg 的 comment header 一般在最前面几个包
+    var p = 0, chunks = [], packets = 0, comments = null, more = false;
+    function flush() {
+      var packet = joinChunks(chunks);
+      chunks = []; packets++;
+      if (!comments) comments = vorbisCommentsIn(packet);
+    }
+    outer:
+    while (p + 27 <= b.length && packets < 6) {
+      if (!at(b, p, 'OggS')) break;
+      var nseg = b[p + 26];
+      if (p + 27 + nseg > b.length) { more = true; break; }
+      var q = p + 27 + nseg;
+      for (var i = 0; i < nseg; i++) {
+        var L = b[p + 27 + i];
+        if (q + L > b.length) { more = true; break outer; }
+        chunks.push(b.subarray(q, q + L));
+        q += L;
+        if (L < 255) { flush(); if (packets >= 6) break outer; }
+      }
+      p = q;
+    }
+    return { cover: comments ? coverFromComments(comments) : null, more: more };
+  }
+  function parseWav(b) {                        // RIFF 里非标准的 ID3 块
+    if (!(at(b, 0, 'RIFF') && at(b, 8, 'WAVE'))) return { cover: null };
+    var p = 12;
+    while (p + 8 <= b.length) {
+      var id = txt(b, p, 4);
+      var size = (b[p + 4] | (b[p + 5] << 8) | (b[p + 6] << 16) | (b[p + 7] << 24)) >>> 0;
+      var base = p + 8;
+      if (id === 'ID3 ' || id === 'id3 ' || id === 'ID32') {
+        if (base + 10 > b.length) return { cover: null, more: true };
+        var pic = parseId3Tag(b.subarray(base, Math.max(base + size, base + 10)));
+        return { cover: pic };
+      }
+      if (size <= 0 || base + size > b.length) return { cover: null, more: true };
+      p = base + size + (size & 1);
+    }
+    return { cover: null, more: true };
+  }
+  function extractCover(bytes, fmt) {
+    try {
+      if (fmt === 'wav') return parseWav(bytes);
+      if (fmt === 'flac') return parseFlac(bytes);
+      if (fmt === 'ogg') return parseOgg(bytes);
+      if (fmt === 'mp3') {
+        if (!at(bytes, 0, 'ID3')) return { cover: null };           // 没有 ID3 标签
+        if (10 + syncsafe(bytes, 6) > bytes.length) return { cover: null, more: true };
+        return { cover: parseId3Tag(bytes) };
+      }
+    } catch (e) { LOG('读封面时出错（' + fmt + '）：' + e.message); }
+    return { cover: null };
+  }
+  /* 读地址开头的一段字节（优先 Range；不支持 / 被忽略时改成流式读、读够就停） */
+  function readPrefix(url, n) {
+    function joinBytes(chunks, got) {
+      var out = new Uint8Array(got), off = 0;
+      chunks.forEach(function (c) { out.set(c, off); off += c.length; });
+      return out;
+    }
+    function readSome(res) {
+      if (res.body && res.body.getReader) {
+        var reader = res.body.getReader(), chunks = [], got = 0;
+        function pump() {
+          return reader.read().then(function (r) {
+            if (r.done) return joinBytes(chunks, got);
+            chunks.push(r.value); got += r.value.length;
+            if (got >= n) {
+              try { var cp = reader.cancel(); if (cp && cp.catch) cp.catch(function () {}); } catch (e) {}
+              return joinBytes(chunks, got);
+            }
+            return pump();
+          });
+        }
+        return pump();
+      }
+      return res.arrayBuffer().then(function (buf) {
+        var b = new Uint8Array(buf);
+        return b.length > n ? b.subarray(0, n) : b;
+      });
+    }
+    function grab(opt) {
+      return fetch(url, opt).then(function (res) {
+        if (!res.ok && res.status !== 206) throw new Error('HTTP ' + res.status);
+        var total = 0, cr = res.headers.get('Content-Range'), cl = res.headers.get('Content-Length'), m;
+        if (cr) { m = /\/(\d+)\s*$/.exec(cr); if (m) total = parseInt(m[1], 10); }
+        if (!total && cl) total = parseInt(cl, 10);
+        return readSome(res).then(function (b) {
+          return { bytes: b, total: total || b.length };
+        });
+      });
+    }
+    return grab({ headers: { Range: 'bytes=0-' + (n - 1) } }).catch(function () {
+      return grab({});        // 有些服务器 / 浏览器不接受 Range，重来一次不带它
+    });
+  }
+  function probeAndCover(url) {
+    var i = 0;
+    function step() {
+      return readPrefix(url, MEDIA_STEPS[i]).then(function (r) {
+        var pr = probeKind(r.bytes);
+        if (pr.kind !== 'audio') return pr;
+        var got = extractCover(r.bytes, pr.fmt);
+        if (got.cover) { pr.cover = got.cover; return pr; }
+        i++;
+        var next = MEDIA_STEPS[i];
+        var whole = r.total && r.bytes.length >= r.total;
+        if (!got.more || !next || whole) return pr;
+        return step();          // 封面可能在更后面 → 多读一点
+      });
+    }
+    return step();
+  }
+  function mediaOf(url) {
+    if (!MEDIA_CACHE[url]) MEDIA_CACHE[url] = probeAndCover(url);
+    return MEDIA_CACHE[url];
+  }
+  function buildMedia(kind, url, alt, coverUrl) {
+    var box = document.createElement('span'), html;
+    if (kind === 'video') {
+      html = '<video class="mb-media" controls preload="metadata" src="' + mbEsc(url) + '"></video>';
+    } else if (coverUrl) {
+      html = '<span class="mb-media-cover"><img src="' + mbEsc(coverUrl) + '" alt="' + mbEsc(alt) + '">'
+           + '<audio class="mb-media" controls preload="metadata" src="' + mbEsc(url) + '"></audio></span>';
+    } else {
+      html = '<audio class="mb-media" controls preload="metadata" src="' + mbEsc(url) + '"></audio>';
+    }
+    box.innerHTML = html;
+    var made = box.firstChild;
+    var mediaEl = box.querySelector('video, audio') || made;
+    if (alt && !mediaEl.getAttribute('aria-label')) mediaEl.setAttribute('aria-label', alt);
+    return made;
+  }
+  /* 换成媒体元素时，把编译期写在 <img> 上的属性带过去（id / aria-label / role / title） */
+  function carryAttrs(from, to) {
+    ['id', 'aria-label', 'role', 'title'].forEach(function (k) {
+      var v = from.getAttribute(k);
+      if (!v || to.hasAttribute(k)) return;
+      if (k === 'aria-label') { var m = to.querySelector('video, audio'); (m || to).setAttribute(k, v); }
+      else to.setAttribute(k, v);
+    });
+  }
+  /* 取不到内容（跨域 / 本地文件）时的退路：拿一个 <video> 试读元数据——
+     能读出画面尺寸就是视频，只有声音就是音频，读不出就还是按图片 */
+  function probeByElement(url) {
+    return new Promise(function (res) {
+      var v, done = false;
+      function finish(kind) {
+        if (done) return;
+        done = true;
+        try { v.removeAttribute('src'); } catch (e) {}
+        res(kind);
+      }
+      try { v = document.createElement('video'); } catch (e) { res(null); return; }
+      v.preload = 'metadata';
+      v.muted = true;
+      v.addEventListener('loadedmetadata', function () { finish(v.videoWidth > 0 ? 'video' : 'audio'); });
+      v.addEventListener('error', function () { finish(null); });
+      setTimeout(function () { finish(null); }, 8000);
+      v.src = url;
+    });
+  }
+  function resolveMedia(el) {
+    var url = el.getAttribute('data-mb-media') || el.getAttribute('src') || '';
+    var alt = el.getAttribute('alt') || '';
+    if (!url || !window.fetch || !window.Promise) return;
+    mediaOf(url).then(function (pr) {
+      if (pr.kind === 'image') return;            // 图片：保持原样的 <img>，不往日志里刷
+      if (pr.kind === 'unknown') { LOG('媒体：「' + url + '」没认出文件头，按图片处理'); return; }
+      var cover = null;
+      if (pr.cover && pr.cover.data && pr.cover.data.length && window.Blob && window.URL) {
+        try { cover = URL.createObjectURL(new Blob([pr.cover.data], { type: pr.cover.mime })); } catch (e) { cover = null; }
+      }
+      var node = buildMedia(pr.kind, url, alt, cover);
+      carryAttrs(el, node);
+      if (el.parentNode) el.parentNode.replaceChild(node, el);
+      LOG('媒体：「' + url + '」→ ' + (pr.kind === 'video' ? '视频' : '音频')
+        + (cover ? '（内嵌封面 ' + Math.round(pr.cover.data.length / 1024) + ' KB）' : '（没有封面）'));
+    }).catch(function (e) {
+      LOG('媒体：「' + url + '」取不到文件头（' + e.message + '）——改用播放器探测');
+      probeByElement(url).then(function (kind) {
+        if (!kind) { LOG('媒体：「' + url + '」按图片处理'); return; }
+        var node2 = buildMedia(kind, url, alt, null);
+        carryAttrs(el, node2);
+        if (el.parentNode) el.parentNode.replaceChild(node2, el);
+        LOG('媒体：「' + url + '」→ ' + (kind === 'video' ? '视频' : '音频') + '（播放器探测，无封面）');
+      });
+    });
+  }
+
+  function scopeOf(el) {
+    if (el.matches && el.matches('input, textarea, select')) DOC_SCOPE.cntnt = el.value;
+    else DOC_SCOPE.cntnt = el.textContent;
+    return DOC_SCOPE;             // 文档级共享：赋值语句写的变量别处也能看到
+  }
+  function fire(el) {
+    if (!el.dataset.mb) return;
+    tick();
+    runScript(el.dataset.mb, el, scopeOf(el));
+  }
+  function init(root) {
+    root = root || document;
+    root.querySelectorAll('.mb-exec[data-mb]').forEach(fire);
+    root.querySelectorAll('button[data-mb], a.mb-btn[data-mb]').forEach(function (el) {
+      el.addEventListener('click', function (e) { e.preventDefault(); fire(el); });
+    });
+    root.querySelectorAll('input[data-mb], textarea[data-mb], select[data-mb]').forEach(function (el) {
+      el.addEventListener('change', function () { fire(el); });
+    });
+    root.querySelectorAll('[data-mb-enter]').forEach(function (el) {
+      el.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        var btn = document.querySelector(el.dataset.mbEnter);
+        if (btn) btn.click();
+      });
+    });
+    // 表格里的折叠块：切换被折叠的行。
+    // 注意：这里【不能】用 hidden / display:none 去藏行——被藏起来的行不再占位，
+    // 跨行的 rowspan 就会把后面的行整片挤歪。做法是让行留在表格里，只换一个类名
+    // （.mb-fold-off，由 CSS 把那一行的内容与内边距收掉）。
+    root.querySelectorAll('.mb-fold-state[data-mb-rows]').forEach(function (el) {
+      var rows = document.querySelectorAll('[data-mb-fold="' + el.id + '"]');
+      function apply() {
+        rows.forEach(function (r) {
+          r.classList.toggle('mb-fold-off', !el.checked);
+          r.removeAttribute('hidden');
+        });
+      }
+      apply();
+      el.addEventListener('change', apply);
+    });
+    // 图片 / 视频 / 音频：编译出来的是 <img src alt data-mb-media="…">，
+    // 这里按文件内容判断它到底是图片、视频还是音频（音频还要抠内嵌封面）
+    if (root.querySelectorAll) {
+      root.querySelectorAll('img[data-mb-media]').forEach(resolveMedia);
+    }
+    // trigger 排在后面、call / use 先跑到的情况：这里补跑一次
+    PENDING.splice(0).forEach(function (p) {
+      var rec = TRIGGERS[p.flag];
+      if (!rec) { LOG('补跑失败：trigger「' + p.flag + '」始终没出现'); return; }
+      var at2 = (p.name === 'call' && rec.anchor && rec.anchor.parentNode) ? rec.anchor : p.anchor;
+      LOG('补跑 ' + p.name + '：' + p.flag);
+      runUnits(rec.units, at2, p.scope);
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { init(); });
+  } else { init(); }
+  window.mb = { init: init, evaluate: evaluate, run: runScript, vars: GLOBAL,
+                log: MB_LOG, triggers: TRIGGERS, media: resolveMedia };
+})();
+</script>
+
+<!-- ============================================================
+     解析器 + 界面
+     ============================================================ -->
+<script>
+(function () {
+'use strict';
+
+/* ==================================================================
+   0. 工具
+   ================================================================== */
+var warnings = [];
+function warn(msg) { if (warnings.indexOf(msg) < 0) warnings.push(msg); }
+var ESCMAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return ESCMAP[c]; }); }
+var UID = 0;
+function uid(p) { UID++; return (p || 'mb') + '-' + UID; }
+/* 分离式折叠块：把用户写的标识符映射成合法的 HTML id */
+function foldId(name) { return 'mbd-' + String(name).trim().replace(/[^\w-]/g, '_'); }
+
+/* ---- 分离式折叠块 ----
+   按钮：  ~[标题]~>[标识符]
+   内容：  [标识符]~>[  ……内容（可以跨行）……  ]
+   开头的 ~ 和两处方括号都是必需的，一个都不能省。
+   宽容处理：`~` 也允许写成全角 `～`、`>` 写成 `＞`；方括号内首尾的空格不计入标识符。
+   标识符由按钮声明，先扫一遍全文把它们收集起来。 */
+var FOLD_BTN_SRC = '[~～]\\[([^\\]\\n]+?)\\]\\s*[~～]\\s*[>＞]\\s*\\[([^\\]\\n]+?)\\]';
+var RE_FOLD_BTN   = new RegExp('^' + FOLD_BTN_SRC);   // 行内：锚定在当前位置
+var RE_FOLD_HEAD  = /^\s*\[([^\]\n]+?)\]\s*[~～]\s*[>＞]\s*\[(.*)$/;
+var FOLD_IDS = Object.create(null);
+function collectFoldIds(src) {
+  FOLD_IDS = Object.create(null);
+  var re = new RegExp(FOLD_BTN_SRC, 'g'), m;
+  while ((m = re.exec(src))) FOLD_IDS[m[2].trim()] = true;
+}
+/* 该行是不是“分离式折叠块的内容区”开头？是则返回 [整行, 标识符, `[` 之后的剩余文本]
+   loose = true 时不再要求“这个标识符有对应的按钮”（表格 / 列表里用，免得把结构切断） */
+function isFoldContentStart(line, loose) {
+  var m = RE_FOLD_HEAD.exec(line);
+  if (!m) return null;
+  m[1] = m[1].trim();
+  if (!loose && !FOLD_IDS[m[1]]) return null;
+  return m;
+}
+/* 读取内容区：从第 j 行、`[` 之后的 tail 开始，按方括号配对找到收尾的 `]` */
+function readFoldContent(lines, j, tail) {
+  var buf = [], depth = 0, out = '', k;
+  function scan(s) {
+    for (var q = 0; q < s.length; q++) {
+      var ch = s[q];
+      if (ch === '\\') { out += (s[q + 1] || ''); q++; continue; }
+      if (ch === '[') { depth++; out += ch; continue; }
+      if (ch === ']') {
+        if (depth === 0) return true;              // 收尾
+        depth--; out += ch; continue;
+      }
+      out += ch;
+    }
+    return false;
+  }
+  if (scan(tail || '')) {
+    if (out !== '') buf.push(out);
+    return { lines: buf, next: j + 1, ok: true };
+  }
+  if (out !== '') buf.push(out);
+  out = '';
+  k = j + 1;
+  while (k < lines.length) {
+    if (scan(lines[k])) {
+      if (out !== '') buf.push(out);
+      return { lines: buf, next: k + 1, ok: true };
+    }
+    buf.push(out); out = ''; k++;
+  }
+  return { lines: buf, next: k, ok: false };      // 少了收尾的 ] → 未闭合
+}
+/* {#id.class} → id/class 属性 */
+function nameAttrs(s) {
+  var id = '', cls = [], re = /([#.])([A-Za-z_][\w-]*)/g, m;
+  while ((m = re.exec(s))) { if (m[1] === '#') id = m[2]; else cls.push(m[2]); }
+  return (id ? ' id="' + esc(id) + '"' : '') + (cls.length ? ' class="' + esc(cls.join(' ')) + '"' : '');
+}
+/* 把属性注入某个块的第一个开标签 */
+function injectAttrs(html, name) { return injectAttrsRaw(html, nameAttrs(name)); }
+function injectAttrsRaw(html, attrStr) {
+  if (!attrStr) return html;
+  return html.replace(/^(\s*<[a-zA-Z][\w-]*)/, '$1' + attrStr);
+}
+/* 命名语句写在元素【后面】（标准 3.1）：`out` 的末尾如果正好是一个刚结束的元素，
+   就返回“属性该插在哪个下标”（开标签里、标签名之后），否则返回 null（说明前面只是普通文字，
+   这时把名字交给所在的块）。 */
+function trailingElement(out) {
+  var m = /<\/([a-zA-Z][\w-]*)>$/.exec(out), tag, ids = [], re, r, depth = 0, k;
+  if (m) {
+    tag = m[1];
+    re = new RegExp('</?' + tag + '(?=[\\s>/])', 'g');
+    while ((r = re.exec(out))) ids.push({ i: r.index, close: out.charAt(r.index + 1) === '/' });
+    for (k = ids.length - 1; k >= 0; k--) {
+      if (ids[k].close) depth++;
+      else { depth--; if (!depth) return ids[k].i + 1 + tag.length; }
+    }
+    return null;
+  }
+  m = /<(img|input|br|hr|source|video|audio|embed|track)(\s[^<>]*)?\/?>$/.exec(out);
+  if (m) return out.length - m[0].length + 1 + m[1].length;
+  return null;
+}
+function injectAttrsAt(html, pos, attrStr) {
+  return attrStr ? html.slice(0, pos) + attrStr + html.slice(pos) : html;
+}
+/* 若干条命名语句合起来（`{#t1}{.c1.c2}` → ` id="t1" class="c1 c2"`） */
+function namesAttrs(list) {
+  var id = '', cls = [], re = /([#.])([A-Za-z_][\w-]*)/g, m, i;
+  for (i = 0; i < list.length; i++) {
+    re.lastIndex = 0;
+    while ((m = re.exec(list[i]))) { if (m[1] === '#') id = m[2]; else cls.push(m[2]); }
+  }
+  return (id ? ' id="' + esc(id) + '"' : '') + (cls.length ? ' class="' + esc(cls.join(' ')) + '"' : '');
+}
+
+/* ==================================================================
+   1. 表达式求值（与标准附录 A 的参考运行时一致）
+   ================================================================== */
+var GLOBALV = Object.create(null);
+function tickClock() {
+  var d = new Date();
+  function p(n) { return String(n).padStart(2, '0'); }
+  GLOBALV.timeh = p(d.getHours());  GLOBALV.timem = p(d.getMinutes());
+  GLOBALV.times = p(d.getSeconds());
+  GLOBALV.timeY = String(d.getFullYear());
+  GLOBALV.timeM = p(d.getMonth() + 1); GLOBALV.timeD = p(d.getDate());
+}
+tickClock();
+GLOBALV.browser = (typeof navigator !== 'undefined' ? navigator.userAgent : '');
+GLOBALV.os = (typeof navigator !== 'undefined' ? (navigator.platform || '') : '');
+
+var TOKEN_RE = new RegExp(
+  '\\s*(' +
+    '\\d+(?:\\.\\d+)?' +
+    '|"(?:[^"\\\\]|\\\\.)*"' +
+    '|\\$[A-Za-z_][A-Za-z0-9_]*\\$' +
+    '|\\+:|\\-:|%:|>:' +
+    '|\\+\\+|--|\\+=|-=|\\*=|\/=' +
+    '|>=|<=|==|!=' +
+    '|\\.-|\\.\\+|\\.\\?' +
+    '|[+\\-*/%()\\[\\],=!|&<>?:]' +
+  ')', 'y');
+
+function tokenize(src) {
+  var out = [], i = 0, m;
+  while (i < src.length) {
+    if (/\s/.test(src[i])) { i++; continue; }
+    TOKEN_RE.lastIndex = i;
+    m = TOKEN_RE.exec(src);
+    if (!m) throw new SyntaxError('非法字符：' + src[i]);
+    out.push(m[1]); i = TOKEN_RE.lastIndex;
+  }
+  return out;
+}
+function truthy(v) {
+  return !(v === '' || v === 0 || v === '0' || v === false || v === null || v === undefined);
+}
+function evalExpr(src, scope) {
+  scope = scope || Object.create(null);
+  var toks = tokenize(src), p = 0;
+  function peek() { return toks[p]; }
+  function eat(t) { if (toks[p] === t) { p++; return true; } return false; }
+  function expect(t) { if (!eat(t)) throw new SyntaxError('期望 “' + t + '”，实为 “' + toks[p] + '”'); }
+  function getVar(n) {
+    if (n === 'cntnt') return scope.cntnt === undefined ? '' : scope.cntnt;
+    if (n in scope) return scope[n];
+    if (n in GLOBALV) return GLOBALV[n];
+    return '';
+  }
+  function setVar(n, v) { if (n === 'cntnt') scope.cntnt = v; else scope[n] = v; return v; }
+  function conditional() {
+    var c = assignment();
+    if (eat('?')) { var a = conditional(); expect(':'); var b = conditional(); return truthy(c) ? a : b; }
+    return c;
+  }
+  function assignment() {
+    var t = peek();
+    if (t && t.charAt(0) === '$') {
+      var name = t.slice(1, -1), op = toks[p + 1];
+      if (op === '=' || op === '+=' || op === '-=' || op === '*=' || op === '/=') {
+        p += 2;
+        var old = getVar(name), rhs = assignment();
+        if (op === '=')  return setVar(name, rhs);
+        if (op === '+=') return setVar(name, Number(old) + Number(rhs));
+        if (op === '-=') return setVar(name, Number(old) - Number(rhs));
+        if (op === '*=') return setVar(name, Number(old) * Number(rhs));
+        return setVar(name, Number(old) / Number(rhs));
+      }
+      if (op === '++' || op === '--') {
+        p += 2; var v0 = Number(getVar(name));
+        setVar(name, op === '++' ? v0 + 1 : v0 - 1); return v0;
+      }
+    }
+    return or();
+  }
+  function or()  { var v = and(); while (eat('|')) { var r = and(); v = truthy(v) || truthy(r); } return v; }
+  function and() { var v = equ(); while (eat('&')) { var r = equ(); v = truthy(v) && truthy(r); } return v; }
+  function equ() {
+    var v = rel();
+    for (;;) { if (eat('==')) v = (v == rel()); else if (eat('!=')) v = (v != rel()); else return v; }
+  }
+  function rel() {
+    var v = strOps();
+    for (;;) {
+      if (eat('>=')) v = (v >= strOps());
+      else if (eat('<=')) v = (v <= strOps());
+      else if (eat('>')) v = (v > strOps());
+      else if (eat('<')) v = (v < strOps());
+      else return v;
+    }
+  }
+  function strOps() {
+    var v = add();
+    for (;;) {
+      if (eat('+:')) { v = String(v) + String(add()); }
+      else if (eat('-:')) { v = String(v).split(String(add())).join(''); }
+      else if (eat('%:')) {
+        var oldS = add();
+        if (!eat('>:')) throw new SyntaxError('“%:” 必须与 “>:” 配对');
+        v = String(v).split(String(oldS)).join(String(add()));
+      } else return v;
+    }
+  }
+  function add() {
+    var v = mul();
+    for (;;) {
+      if (eat('+')) v = Number(v) + Number(mul());
+      else if (eat('-')) v = Number(v) - Number(mul());
+      else return v;
+    }
+  }
+  function mul() {
+    var v = unary();
+    for (;;) {
+      if (eat('*')) v = Number(v) * Number(unary());
+      else if (eat('/')) v = Number(v) / Number(unary());
+      else if (eat('%')) v = Number(v) % Number(unary());
+      else return v;
+    }
+  }
+  function unary() {
+    if (eat('!')) return !truthy(unary());
+    if (eat('-')) return -Number(unary());
+    if (eat('+')) return Number(unary());
+    return postfix();
+  }
+  function postfix() {
+    var v = primary();
+    for (;;) {
+      if (eat('[')) { var n = conditional(); expect(']'); v = String(v).charAt(Number(n) - 1); }
+      else if (eat('.-')) v = Math.floor(Number(v));
+      else if (eat('.+')) v = Math.ceil(Number(v));
+      else if (eat('.?')) v = Math.round(Number(v));
+      else return v;
+    }
+  }
+  function primary() {
+    var t = peek();
+    if (t === undefined) throw new SyntaxError('表达式意外结束');
+    if (/^\d/.test(t)) { p++; return parseFloat(t); }
+    if (t.charAt(0) === '"') { p++; return JSON.parse(t); }
+    if (t.charAt(0) === '$') { p++; return getVar(t.slice(1, -1)); }
+    if (eat('(')) { var v = conditional(); expect(')'); return v; }
+    throw new SyntaxError('无法解析：“' + t + '”');
+  }
+  var value = conditional();
+  if (p !== toks.length) throw new SyntaxError('表达式未完全解析');
+  return value;
+}
+function calc(expr) {
+  try { return evalExpr(expr, Object.create(null)); }
+  catch (e) { warn('计算失败：' + expr + '（' + e.message + '）'); return ''; }
+}
+
+/* ==================================================================
+   2. 内容语句
+   ================================================================== */
+var GREEK = {
+  alpha:'α', beta:'β', gamma:'γ', delta:'δ', epsilon:'ε', zeta:'ζ', eta:'η', theta:'θ',
+  iota:'ι', kappa:'κ', lambda:'λ', mu:'μ', nu:'ν', xi:'ξ', omicron:'ο', pi:'π', rho:'ρ',
+  sigma:'σ', tau:'τ', upsilon:'υ', phi:'φ', chi:'χ', psi:'ψ', omega:'ω',
+  Alpha:'Α', Beta:'Β', Gamma:'Γ', Delta:'Δ', Epsilon:'Ε', Zeta:'Ζ', Eta:'Η', Theta:'Θ',
+  Iota:'Ι', Kappa:'Κ', Lambda:'Λ', Mu:'Μ', Nu:'Ν', Xi:'Ξ', Omicron:'Ο', Pi:'Π', Rho:'Ρ',
+  Sigma:'Σ', Tau:'Τ', Upsilon:'Υ', Phi:'Φ', Chi:'Χ', Psi:'Ψ', Omega:'Ω'
+};
+var EMOJI = {
+  smile:'😄', grin:'😁', joy:'😂', heart:'❤️', thumbsup:'👍', thumbsdown:'👎', ok:'👌',
+  cry:'😢', sob:'😭', wink:'😉', thinking:'🤔', fire:'🔥', star:'⭐', check:'✅',
+  cross:'❌', warning:'⚠️', question:'❓', exclamation:'❗', tada:'🎉', rocket:'🚀'
+};
+var CONTROL = {
+  nbsp:'&nbsp;', copy:'&copy;', reg:'&reg;', trade:'&trade;', hellip:'&hellip;',
+  mdash:'&mdash;', ndash:'&ndash;', laquo:'&laquo;', raquo:'&raquo;',
+  lsquo:'&lsquo;', rsquo:'&rsquo;', ldquo:'&ldquo;', rdquo:'&rdquo;',
+  times:'&times;', divide:'&divide;', plusmn:'&plusmn;', deg:'&deg;',
+  larr:'&larr;', rarr:'&rarr;', uarr:'&uarr;', darr:'&darr;', harr:'&harr;',
+  infin:'&infin;', ne:'&ne;', le:'&le;', ge:'&ge;', middot:'&middot;', bull:'&bull;'
+};
+function contentStatement(cat, name) {
+  cat = cat.trim(); name = name.trim();
+  if (cat === 'greek') {
+    if (GREEK[name]) return GREEK[name];
+    warn('未知的希腊字母：' + name);
+  } else if (cat === 'emoji' || cat === 'icon') {
+    var key = name.split(':')[0];
+    if (EMOJI[key]) return EMOJI[key];
+    warn('未知的 ' + cat + '：' + name);
+  } else if (cat === 'control') {
+    if (CONTROL[name]) return CONTROL[name];
+    warn('未知的控制字符：' + name);
+  } else if (cat === 'unicode') {
+    var cp = parseInt(name, 16);
+    if (!isNaN(cp)) return String.fromCodePoint(cp);
+    warn('非法码位：' + name);
+  } else {
+    warn('未知的内容语句分类：' + cat);
+  }
+  return '{:' + cat + ':' + name + ':}';
+}
+
+/* ==================================================================
+   3. 行内解析
+   ================================================================== */
+
+/* 找配对的结束定界符；返回其下标，找不到返回 -1 */
+function findClose(src, from, open, close) {
+  var depth = 1, i = from, n = src.length;
+  while (i < n) {
+    var c = src[i];
+    if (c === '\\') { i += 2; continue; }
+    if (c === '`') { var e = src.indexOf('`', i + 1); i = e < 0 ? n : e + 1; continue; }
+    if (src.startsWith(open, i)) { depth++; i += open.length; continue; }
+    if (src.startsWith(close, i)) { depth--; if (!depth) return i; i += close.length; continue; }
+    i++;
+  }
+  return -1;
+}
+/* 取一对定界符之间的内容 */
+function pair(src, i, open, close) {
+  if (!src.startsWith(open, i)) return null;
+  var c = findClose(src, i + open.length, open, close);
+  if (c < 0) return null;
+  return { inner: src.slice(i + open.length, c), end: c + close.length };
+}
+/* 找下一个同样的定界符（** __ ~~ 这类对称定界符用） */
+function findSame(src, from, mark) {
+  var i = from;
+  while (i <= src.length - mark.length) {
+    if (src[i] === '\\') { i += 2; continue; }
+    if (src.startsWith(mark, i)) return i;
+    i++;
+  }
+  return -1;
+}
+/* 找结束定界符，但先略过 skip 次（解析语句 {/`=n} 的语义） */
+function findFenceEnd(src, from, fence, skip) {
+  var idx = from;
+  for (;;) {
+    var e = src.indexOf(fence, idx);
+    if (e < 0) return -1;
+    if (skip > 0) { skip--; idx = e + fence.length; continue; }
+    return e;
+  }
+}
+/* 扫描一个大括号块，返回匹配 } 的下标 */
+function braceEnd(src, i) {
+  var depth = 0, inStr = false, n = src.length;
+  for (var j = i; j < n; j++) {
+    var c = src[j];
+    if (inStr) { if (c === '\\') j++; else if (c === '"') inStr = false; continue; }
+    if (c === '"') { inStr = true; continue; }
+    if (c === '{') depth++;
+    else if (c === '}') { depth--; if (!depth) return j; }
+  }
+  return -1;
+}
+function colorSpan(cls, inner, orig) {
+  var html = inline(inner);
+  // 可选颜色：#rgb / #rrggbb / 颜色名
+  var m = /^\s*(#[0-9a-fA-F]{3,8}|[a-zA-Z]{3,20})(?=[^\w#])/.exec(orig);
+  if (m) {
+    var isBg = cls.indexOf('bgcolored') >= 0 || cls.indexOf('bgpartial') >= 0;
+    var isFg = cls.indexOf('fgcolored') >= 0;
+    var style = [];
+    if (isFg) style.push('--mbhighlightcolor:' + m[1]);
+    if (isBg) style.push('--mbhighlightbgcolor:' + m[1]);
+    var cut = orig.indexOf(m[1]) + m[1].length;
+    inner = inner.slice(cut);
+    html = inline(inner);
+    return '<span class="' + cls + '" style="' + style.join(';') + '">' + html + '</span>';
+  }
+  return '<span class="' + cls + '">' + html + '</span>';
+}
+
+/* 把触发器文字里的计算语句 {`expr`} 挑出来：触发器里它只算不输出（见 3.9.7） */
+function extractCalcs(text) {
+  var script = '';
+  var clean = String(text).replace(/\{`([^`\n]*)`\}/g, function (m, expr) {
+    script += '{{calc:' + expr + '}}';
+    return '';
+  });
+  return { text: clean, script: script };
+}
+/* ---- 可交互元素：在位置 i 尝试解析一个元素，返回 {html,end} 或 null ---- */
+function parseElementAt(src, i, ctx) {
+  // 多行输入框 [:[placeholder](默认内容){{...}}]
+  if (src.startsWith('[:', i)) {
+    var e1 = findClose(src, i + 2, '[', ']');
+    if (e1 > 0) {
+      var body = src.slice(i + 2, e1), sc1 = '';
+      var m1 = /\{\{[\s\S]*?\}\}\s*$/.exec(body);
+      if (m1) { sc1 = m1[0].trim(); body = body.slice(0, m1.index); }
+      var pm = /^\s*\[([^\]]*)\]\s*(?:\(([^)]*)\))?\s*$/.exec(body);
+      return { html: textareaHtml(pm ? pm[1] : '', pm && pm[2] ? pm[2] : '', sc1), end: e1 + 1 };
+    }
+  }
+  // 选择框 [;[占位][选项1][选项2](默认){{...}}]
+  if (src.startsWith('[;', i)) {
+    var e2 = findClose(src, i + 2, '[', ']');
+    if (e2 > 0) {
+      var b2 = src.slice(i + 2, e2), sc2 = '';
+      var m2 = /\{\{[\s\S]*?\}\}\s*$/.exec(b2);
+      if (m2) { sc2 = m2[0].trim(); b2 = b2.slice(0, m2.index); }
+      var opts = [], mm, re2 = /\[([^\]]*)\]/g;
+      while ((mm = re2.exec(b2))) opts.push(mm[1]);
+      var dm = /\(([^)]*)\)/.exec(b2);
+      return { html: selectHtml(opts, dm ? dm[1] : '', sc2), end: e2 + 1 };
+    }
+  }
+  // 输入框 :[placeholder](默认内容)->(#id){{...}}
+  if (src.startsWith(':[', i)) {
+    var e3 = findClose(src, i + 2, '[', ']');
+    if (e3 > 0) {
+      var ph3 = src.slice(i + 2, e3), k = e3 + 1, val3 = '', enter = '', sc3 = '';
+      if (src[k] === '(') { var c3 = src.indexOf(')', k); if (c3 > 0) { val3 = src.slice(k + 1, c3); k = c3 + 1; } }
+      if (src.startsWith('->(', k)) { var c4 = src.indexOf(')', k + 3); if (c4 > 0) { enter = src.slice(k + 4, c4); k = c4 + 1; } }
+      while (src.startsWith('{{', k)) {
+        var c5 = braceEnd(src, k);
+        if (c5 < 0) break;
+        sc3 += src.slice(k, c5 + 1); k = c5 + 1;
+      }
+      return { html: inputHtml(ph3, val3, enter, sc3), end: k };
+    }
+  }
+  // 按钮 / 按钮式连接：[[显示文字](地址)] 或 [[显示文字]{{执行语句}}]
+  if (src.startsWith('[[', i)) {
+    var rc = /^[^\]\\]*/.exec(src.slice(i + 2));
+    var e4 = i + 2 + rc[0].length;
+    if (src[e4] === ']') {
+      var text = src.slice(i + 2, e4), k4 = e4 + 1, url4 = '', sc4 = '';
+      if (src[k4] === '(') { var c6 = src.indexOf(')', k4); if (c6 > 0) { url4 = src.slice(k4 + 1, c6); k4 = c6 + 1; } }
+      while (src.startsWith('{{', k4)) {
+        var c7 = braceEnd(src, k4);
+        if (c7 < 0) break;
+        sc4 += src.slice(k4, c7 + 1); k4 = c7 + 1;
+      }
+      if (src[k4] === ']') {
+        k4++;
+        if (url4 && !sc4) {
+          return { html: '<a class="mb-btn" href="' + esc(url4) + '">' + inline(text) + '</a>', end: k4 };
+        }
+        var ex4 = extractCalcs(text);
+        return { html: buttonHtml(ex4.text, sc4 + ex4.script), end: k4 };
+      }
+    }
+  }
+  // 任务列表的 checkbox（行内形式）
+  if (src.startsWith('[ ]', i) || src.startsWith('[x]', i) || src.startsWith('[X]', i)) {
+    var on = src[i + 1] !== ' ';
+    return { html: '<input type="checkbox" disabled' + (on ? ' checked' : '') + '>', end: i + 3 };
+  }
+  return null;
+}
+function inputHtml(ph, val, enter, script) {
+  var a = ' type="text" class="mb-input"';
+  if (ph) a += ' placeholder="' + esc(ph) + '"';
+  if (val) a += ' value="' + esc(val) + '"';
+  if (enter) a += ' data-mb-enter="#' + esc(enter.replace(/^#/, '')) + '"';
+  if (script) a += ' data-mb="' + esc(script) + '"';
+  return '<input' + a + '>';
+}
+function textareaHtml(ph, val, script) {
+  var a = ' class="mb-input"';
+  if (ph) a += ' placeholder="' + esc(ph) + '"';
+  if (script) a += ' data-mb="' + esc(script) + '"';
+  return '<textarea' + a + '>' + esc(val) + '</textarea>';
+}
+function selectHtml(opts, def, script) {
+  var h = '<select class="mb-input"' + (script ? ' data-mb="' + esc(script) + '"' : '') + '>';
+  if (opts.length) h += '<option value="" disabled hidden>' + esc(opts[0]) + '</option>';
+  for (var i = 1; i < opts.length; i++) {
+    var o = opts[i], v = o, t = o, eq = o.indexOf('=');
+    if (eq >= 0) { t = o.slice(0, eq); v = o.slice(eq + 1); }
+    h += '<option value="' + esc(v) + '"' + (def && t === def ? ' selected' : '') + '>' + esc(t) + '</option>';
+  }
+  return h + '</select>';
+}
+function buttonHtml(label, script) {
+  return '<button type="button" class="mb-btn"' + (script ? ' data-mb="' + esc(script) + '"' : '')
+       + '>' + inline(label) + '</button>';
+}
+
+/* ---- 执行语句 / 计算语句 / 变量 ---- */
+function execStatement(inner, scope) {
+  // inner = `{fn:arg}` 的串接（不含最外层大括号）
+  var anchorId = uid('exec');
+  return '<span class="mb-exec" id="' + anchorId + '" data-mb="{{' + esc(inner) + '}}"></span>';
+}
+function calcStatement(expr) {
+  if (expr.indexOf('$') < 0) {                       // 无变量 → 编译期直接算出来
+    try { return esc(String(evalExpr(expr, Object.create(null)))); } catch (e) { /* 落回运行时 */ }
+  }
+  return '<span class="mb-exec" data-mb="{{put:' + esc(expr) + '}}"></span>';
+}
+function varStatement(name) {
+  return '<span class="mb-exec" data-mb="{{put:$' + esc(name) + '$}}"></span>';
+}
+
+/* ---- ruby ---- */
+function rubyHtml(base, up, down, under) {
+  function mark(t) {
+    return '<rp>(</rp><rt>' + t + '</rt><rp>)</rp>';
+  }
+  function dots(s) {
+    var h = '';
+    for (var i = 0; i < s.length; i++) h += esc(s[i]) + '<rp>(</rp><rt>●</rt><rp>)</rp>';
+    return h;
+  }
+  var baseHtml = base.indexOf('【') >= 0 ? inline(base) : esc(base);
+  var upHtml = up ? (up.indexOf('【') >= 0 ? inline(up) : esc(up)) : '';
+  var downHtml = down ? esc(down) : '';
+  var needDots = !up && !down;
+  if (needDots) {                       // 着重号：每个字符各自一组；/ 型要标在下方
+    var h = '';
+    for (var i = 0; i < base.length; i++) h += esc(base[i]) + '<rp>(</rp><rt>●</rt><rp>)</rp>';
+    return '<ruby' + (under ? ' class="mb-ruby-under"' : '') + '>' + h + '</ruby>';
+  }
+  if (up && down) {                     // 上下都有：外层 ruby 走 under，内层显式压回 over
+    return '<ruby class="mb-ruby-under"><ruby class="mb-ruby-over">' + baseHtml + mark(upHtml)
+         + '</ruby><rp>(</rp><rt>' + downHtml + '</rt><rp>)</rp></ruby>';
+  }
+  if (down) {
+    return '<ruby class="mb-ruby-under">' + baseHtml + '<rp>(</rp><rt>' + downHtml + '</rt><rp>)</rp></ruby>';
+  }
+  return '<ruby>' + baseHtml + '<rp>(</rp><rt>' + upHtml + '</rt><rp>)</rp></ruby>';
+}
+function parseRuby(inner) {
+  var bar = -1, slash = -1, depth = 0, i;
+  for (i = 0; i < inner.length; i++) {
+    var c = inner[i];
+    if (c === '【') { depth++; continue; }
+    if (c === '】') { depth--; continue; }
+    if (depth > 0) continue;
+    if ((c === '|' || c === '｜') && bar < 0 && slash < 0) bar = i;
+    else if ((c === '/' || c === '／') && slash < 0 && bar < 0) slash = i;
+  }
+  if (bar < 0 && slash < 0) return rubyHtml(inner, '', '', false);
+  var isBar = bar >= 0, i0 = isBar ? bar : slash;
+  var base = inner.slice(0, i0), after = inner.slice(i0 + 1), up = '', down = '';
+  if (isBar) {
+    var s2 = -1, d2 = 0;
+    for (var j = 0; j < after.length; j++) {
+      var c2 = after[j];
+      if (c2 === '【') { d2++; continue; }
+      if (c2 === '】') { d2--; continue; }
+      if (d2 === 0 && (c2 === '/' || c2 === '／')) { s2 = j; break; }
+    }
+    if (s2 >= 0) { up = after.slice(0, s2); down = after.slice(s2 + 1); }
+    else up = after;
+  } else {
+    down = after;
+  }
+  return rubyHtml(base, up, down, !isBar);
+}
+
+/* ---- 折叠块（行内/块级共用渲染） ---- */
+function foldHtml(title, body, close, open, block) {
+  if (close !== undefined && close !== null) {           // 三段式：标题展开后消失，末尾出现收起文本
+    var id = uid('fold');
+    var t = block ? 'div' : 'span';
+    var cls = block ? 'mb-fold-block' : 'mb-fold-inline';
+    return '<' + t + ' class="' + cls + '">'
+         + '<input type="checkbox" class="mb-fold-state" id="' + id + '"' + (open ? ' checked' : '') + '>'
+         + '<label class="mb-fold-title" for="' + id + '">' + inline(title) + '</label>'
+         + '<' + t + ' class="mb-fold-body">' + body + '</' + t + '>'
+         + '<label class="mb-fold-close" for="' + id + '">' + inline(close === '' ? '▲' : close) + '</label>'
+         + '</' + t + '>';
+  }
+  return '<details class="mb-fold"' + (open ? ' open' : '') + '>'
+       + '<summary>' + inline(title) + '</summary>' + body + '</details>';
+}
+
+/* ==================== 行内主循环 ==================== */
+function inline(src, scope, skip) {
+  scope = scope || {};
+  var out = '', i = 0, n = src.length, pendingSkip = skip || 0;
+  function push(s) { out += s; }
+
+  while (i < n) {
+    var c = src[i];
+
+    /* 解析语句 {/`=n} 只作用于紧随其后的那一个块，不向后传递 */
+    if (pendingSkip > 0 && c !== '`' && !src.startsWith('[o[', i)) pendingSkip = 0;
+
+    /* ---- 转义符 / 原始转义符 ---- */
+    if (c === '\\') {
+      var nx = src[i + 1];
+      if (nx === 'o' && src[i + 2] !== undefined) { push(esc(src[i + 2])); i += 3; continue; }
+      if (nx === undefined) { push('\\'); i++; continue; }
+      if (nx === '\n') { i += 2; continue; }
+      var named = { n: '<br>', t: '\t', '<': '&lt;', '>': '&gt;', '&': '&amp;', '\\': '\\' };
+      push(named[nx] !== undefined ? named[nx] : esc(nx));
+      i += 2; continue;
+    }
+
+    /* ---- 解析语句 {/`=n}：让紧随其后的那个块略过前 n 次结束标识 ---- */
+    if (src.startsWith('{/`', i)) {
+      var skm = /^\{\/`(?:=(\d*))?\}/.exec(src.slice(i));
+      if (skm) {
+        pendingSkip = (skm[1] === undefined || skm[1] === '') ? 1 : parseInt(skm[1], 10);
+        i += skm[0].length; continue;
+      }
+    }
+
+    /* ---- 行内代码 ---- */
+    if (c === '`') {
+      var t = 0; while (src[i + t] === '`') t++;
+      var fence = '`'.repeat(t);
+      var e = findFenceEnd(src, i + t, fence, pendingSkip);
+      var skipped = pendingSkip > 0; pendingSkip = 0;
+      if (e < 0 && skipped) {                 // 略过次数多于实际次数 → 延伸到行尾
+        push('<code>' + esc(src.slice(i + t)) + '</code>');
+        i = n; continue;
+      }
+      if (e >= 0) {
+        var code = src.slice(i + t, e);
+        if (code.length > 2 && code[0] === ' ' && code[code.length - 1] === ' ') code = code.slice(1, -1);
+        push('<code>' + esc(code) + '</code>');
+        i = e + t; continue;
+      }
+    }
+
+    /* ---- 原始文本 [o[ ... ]o] ---- */
+    if (src.startsWith('[o[', i)) {
+      var c1 = findFenceEnd(src, i + 3, ']o]', pendingSkip);
+      var skipped2 = pendingSkip > 0; pendingSkip = 0;
+      if (c1 < 0 && skipped2) {               // 略过次数多于实际次数 → 延伸到行尾
+        push('<span class="mb-origin">' + esc(src.slice(i + 3)) + '</span>');
+        i = n; continue;
+      }
+      if (c1 >= 0) {
+        push('<span class="mb-origin">' + esc(src.slice(i + 3, c1)) + '</span>');
+        i = c1 + 3; continue;
+      }
+    }
+
+    /* ---- 可交互元素（含标签的自动绑定） ---- */
+    if (c === ':' || c === '[') {
+      var el = parseElementAt(src, i, scope);
+      if (el) { push(el.html); i = el.end; continue; }
+    }
+
+    /* ---- 分离式折叠块的按钮：~[标题]~>[标识符]（开头的 ~ 不能省） ---- */
+    if (c === '~' || c === '～' || c === '[') {
+      var bm = RE_FOLD_BTN.exec(src.slice(i));
+      if (bm) {
+        var fidB = foldId(bm[2].trim());
+        push('<input type="checkbox" class="mb-fold-state" id="' + esc(fidB)
+           + '" data-mb-rows="' + esc(fidB) + '">'
+           + '<label class="mb-fold-title" for="' + esc(fidB) + '">' + inline(bm[1].trim()) + '</label>');
+        i += bm[0].length; continue;
+      }
+    }
+
+    /* ---- 标签 ::文字: ---- */
+    if (src.startsWith('::', i)) {
+      /* 结束位置取最靠前的那个：第一个可交互元素 / 一个 “:” / 行尾 */
+      var j = i + 2, txt = '', target = null, colon = false;
+      while (j < n && src[j] !== '\n') {
+        var el0 = parseElementAt(src, j, scope);
+        if (el0) { target = el0; break; }
+        if (src[j] === '\\') { txt += src[j + 1] || ''; j += 2; continue; }
+        if (src[j] === ':') { colon = true; j++; break; }
+        txt += src[j]; j++;
+      }
+      if (colon && !target) {                 // “:” 之后还可以跟一个元素
+        var k = j;
+        while (k < n && src[k] !== '\n' && /\s/.test(src[k])) k++;
+        var el1 = parseElementAt(src, k, scope);
+        if (el1) target = el1;
+      }
+      var labelText = txt.replace(/\s+$/, '');
+      if (target) {
+        push('<label class="mb-label">' + inline(labelText) + target.html + '</label>');
+        i = target.end; continue;
+      }
+      push('<label class="mb-label">' + inline(labelText) + '</label>');
+      i = j; continue;
+    }
+
+    /* ---- 图片 / 视频 / 音频 ----
+       基本形态还是 <img>（没有脚本时最差也只是显示成图片），
+       多带一个 data-mb-media，运行时按【文件内容】判断它到底是图片 / 视频 / 音频 */
+    if (c === '!' && src[i + 1] === '[') {
+      var ie = findClose(src, i + 2, '[', ']');
+      if (ie > 0 && src[ie + 1] === '(') {
+        var ic = src.indexOf(')', ie + 1);
+        if (ic > 0) {
+          var murl = src.slice(ie + 2, ic);
+          push('<img src="' + esc(murl) + '" alt="' + esc(src.slice(i + 2, ie))
+             + '" data-mb-media="' + esc(murl) + '">');
+          i = ic + 1; continue;
+        }
+      }
+    }
+
+    /* ---- 上色 ---- */
+    var COLOR = [["!'", "'!", 'mb-fgcolored'], ['!,', ',!', 'mb-bgcolored'],
+                 ['!.', '.!', 'mb-bgpartialcolored'], ['!;', ';!', 'mb-fgcolored mb-bgcolored'],
+                 ['!:', ':!', 'mb-fgcolored mb-bgpartialcolored']];
+    var hitColor = null;
+    for (var ci = 0; ci < COLOR.length; ci++) {
+      if (src.startsWith(COLOR[ci][0], i)) { hitColor = COLOR[ci]; break; }
+    }
+    if (hitColor) {
+      var pc = pair(src, i, hitColor[0], hitColor[1]);
+      if (pc && pc.inner.length) { push(colorSpan(hitColor[2], pc.inner, pc.inner)); i = pc.end; continue; }
+    }
+
+    /* ---- 竖排中的横排 [-[内容]-]（只能在竖排块里用） ---- */
+    if (src.startsWith('[-[', i)) {
+      var vh = pair(src, i, '[-[', ']-]');
+      if (vh) { push('<span class="mb-horizontal">' + inline(vh.inner) + '</span>'); i = vh.end; continue; }
+    }
+    /* ---- 竖排文本 [|[内容]|]（内外两层方括号都是必需的，[|内容|] 不合法） ---- */
+    if (src.startsWith('[|[', i)) {
+      var vv = pair(src, i, '[|[', ']|]');
+      if (vv) { push('<span class="mb-vertical">' + inline(vv.inner).replace(/\n/g, '<br>') + '</span>'); i = vv.end; continue; }
+    }
+
+    /* ---- 全角竖排「「」」「『』」 ---- */
+    if (src.startsWith('「「', i)) {
+      var v1 = pair(src, i, '「「', '」」');
+      if (v1) { push('<span class="mb-vertical">' + inline(v1.inner).replace(/\n/g, '<br>') + '</span>'); i = v1.end; continue; }
+    }
+    if (src.startsWith('『『', i)) {
+      var v2 = pair(src, i, '『『', '』』');
+      if (v2) { push('<span class="mb-horizontal">' + inline(v2.inner) + '</span>'); i = v2.end; continue; }
+    }
+
+    /* ---- 折叠块 ---- */
+    if (src.startsWith('~[', i)) {
+      var fo = tryFoldInline(src, i, scope);
+      if (fo) { push(fo.html); i = fo.end; continue; }
+    }
+
+    /* ---- 链接 [text](url) / 脚注 [^n] ---- */
+    if (c === '[') {
+      if (src[i + 1] === '^') {
+        var fe = src.indexOf(']', i);
+        if (fe > 0) {
+          var key = src.slice(i + 2, fe);
+          push('<sup class="mb-fnref"><a href="#fn-' + esc(key) + '">' + esc(key) + '</a></sup>');
+          i = fe + 1; continue;
+        }
+      }
+      var le = findClose(src, i + 1, '[', ']');
+      if (le > 0 && src[le + 1] === '(') {
+        var lc = src.indexOf(')', le + 1);
+        if (lc > 0) {
+          var href = src.slice(le + 2, lc);
+          if (href.startsWith('::')) href = '#' + href.slice(2);
+          push('<a href="' + esc(href) + '">' + inline(src.slice(i + 1, le)) + '</a>');
+          i = lc + 1; continue;
+        }
+      }
+    }
+
+    /* ---- ruby ---- */
+    if (c === '【') {
+      var rb = pair(src, i, '【', '】');
+      if (rb) { push(parseRuby(rb.inner)); i = rb.end; continue; }
+    }
+    if (src.startsWith('[(', i)) {
+      var rb2 = pair(src, i, '[(', ')]');
+      if (rb2) { push(parseRuby(rb2.inner)); i = rb2.end; continue; }
+    }
+
+    /* ---- 变大 ---- */
+    var big = pair(src, i, '<-[', ']->') || pair(src, i, '+[', ']+');
+    if (big) { push('<span class="mb-bigger">' + inline(big.inner) + '</span>'); i = big.end; continue; }
+    /* ---- 变小 ---- */
+    var small = pair(src, i, '->[', ']<-') || pair(src, i, '-[', ']-');
+    if (small) { push('<span class="mb-smaller">' + inline(small.inner) + '</span>'); i = small.end; continue; }
+
+    /* ---- 上标 / 下标 ---- */
+    var sup = pair(src, i, '^[', ']^');
+    if (sup) { push('<sup>' + inline(sup.inner) + '</sup>'); i = sup.end; continue; }
+    var sub = pair(src, i, '_[', ']_');
+    if (sub) { push('<sub>' + inline(sub.inner) + '</sub>'); i = sub.end; continue; }
+
+    /* ---- 注解 / 灰色 / 涂黑 ---- */
+    var com = pair(src, i, '_(', ')_');
+    if (com) { push('<span class="mb-commental">' + inline(com.inner) + '</span>'); i = com.end; continue; }
+    var gray = pair(src, i, '@(', ')@');
+    if (gray) { push('<span class="mb-gray">' + inline(gray.inner) + '</span>'); i = gray.end; continue; }
+    var blk = pair(src, i, '#(', ')#');
+    if (blk) { push('<span class="mb-blacked">' + inline(blk.inner) + '</span>'); i = blk.end; continue; }
+
+    /* ---- 功能语句 ---- */
+    if (c === '{') {
+      // 命名语句：写在元素【后面】——给紧挨在它前面的那个元素取名；
+      // 前面是普通文字（不是元素）时，交给“它所在的那个块”（标题 / 段落 / 列表项 / 单元格）
+      if (src[i + 1] === '#' || src[i + 1] === '.') {
+        var ne = src.indexOf('}', i);
+        if (ne > 0) {
+          var nm = namesAttrs([src.slice(i + 1, ne)]);
+          var te = out.length ? trailingElement(out) : null;
+          if (te !== null) out = injectAttrsAt(out, te, nm);
+          else if (scope.attrs) scope.attrs.push(nm);
+          i = ne + 1; continue;
+        }
+      }
+      // 内容语句
+      if (src.startsWith('{:', i)) {
+        var ce = findClose(src, i + 1, '{:', ':}');
+        if (ce > 0) {
+          var parts = src.slice(i + 2, ce).split(':');
+          push(esc(contentStatement(parts[0] || '', parts[1] || '')));
+          i = ce + 2; continue;
+        }
+      }
+      // 计算语句 {`expr`}
+      if (src[i + 1] === '`') {
+        var ce2 = src.indexOf('`', i + 2);
+        if (ce2 > 0 && src[ce2 + 1] === '}') {
+          var pe = pair(src, i, '{`', '`}');
+          push(calcStatement(src.slice(i + 2, ce2)));
+          i = ce2 + 2; continue;
+        }
+      }
+      // 排版调整语句 {| ... |}
+      if (src.startsWith('{|', i)) {
+        var le2 = src.indexOf('|}', i + 2);
+        if (le2 > 0) { i = le2 + 2; continue; }          // 行内使用：只影响所在块，先略过
+      }
+      // 图表生成语句 {[ ... ]}
+      if (src.startsWith('{[', i)) {
+        var ch = pair(src, i, '{[', ']}');
+        if (ch) { push(chartHtml(ch.inner)); i = ch.end; continue; }
+      }
+      // 变量语句 {$name$}
+      if (src[i + 1] === '$') {
+        var ve = src.indexOf('$}', i + 2);
+        if (ve > 0) { push(varStatement(src.slice(i + 2, ve))); i = ve + 2; continue; }
+      }
+      // 执行语句 {{...}}
+      if (src[i + 1] === '{') {
+        var k2 = i + 1, groups = [];
+        while (src[k2] === '{') {
+          var be = braceEnd(src, k2);
+          if (be < 0) break;
+          groups.push(src.slice(k2 + 1, be));
+          k2 = be + 1;
+        }
+        if (groups.length && src[k2] === '}') {
+          push(execStatement(groups.join('}{'), scope));
+          i = k2 + 1; continue;
+        }
+      }
+    }
+    /* ---- aria-label：在元素【后面】写 ((描述))（标准 3.22）----
+       例：`![图片](url)((一张猫的照片))` → 给这个元素加 aria-label */
+    if (src.startsWith('((', i)) {
+      var ae = findClose(src, i + 2, '(', ')');
+      if (ae > 0) {
+        var aattr = ' aria-label="' + esc(src.slice(i + 2, ae).replace(/\s*\n\s*/g, ' ')) + '"';
+        var at = out.length ? trailingElement(out) : null;
+        if (at !== null) out = injectAttrsAt(out, at, aattr);
+        else if (scope.attrs) scope.attrs.push(aattr);
+        i = ae + 2; continue;
+      }
+    }
+
+    /* ---- 变量 ---- */
+    if (c === '$') {
+      var vEnd = src.indexOf('$', i + 1);
+      if (vEnd > 0 && /^[A-Za-z_][A-Za-z0-9_]*$/.test(src.slice(i + 1, vEnd))) {
+        push(varStatement(src.slice(i + 1, vEnd)));
+        i = vEnd + 1; continue;
+      }
+    }
+
+    /* ---- 强调 / 加粗 / 删除线 ---- */
+    if (src.startsWith('**', i) || src.startsWith('__', i)) {
+      var be2 = findSame(src, i + 2, src.slice(i, i + 2));
+      if (be2 > i + 2) { push('<strong>' + inline(src.slice(i + 2, be2)) + '</strong>'); i = be2 + 2; continue; }
+    }
+    if (src.startsWith('~~', i)) {
+      var se = findSame(src, i + 2, '~~');
+      if (se > i + 2) { push('<del>' + inline(src.slice(i + 2, se)) + '</del>'); i = se + 2; continue; }
+    }
+    if (c === '*') {
+      var e2 = findSame(src, i + 1, '*');
+      if (e2 > i + 1) { push('<em>' + inline(src.slice(i + 1, e2)) + '</em>'); i = e2 + 1; continue; }
+    }
+    if (c === '_') {          // mb：单个下划线 = 下划线，斜体一律用 *
+      var e5 = findSame(src, i + 1, '_');
+      if (e5 > i + 1) { push('<u>' + inline(src.slice(i + 1, e5)) + '</u>'); i = e5 + 1; continue; }
+    }
+
+    /* ---- HTML 原样 ---- */
+    if (c === '<') {
+      var hm = /^<\/?[a-zA-Z][\w-]*(\s[^<>]*)?\/?>/.exec(src.slice(i));
+      if (hm) { push(hm[0]); i += hm[0].length; continue; }
+      if (src.startsWith('<!--', i)) {
+        var hc = src.indexOf('-->', i + 4);
+        if (hc > 0) { push(src.slice(i, hc + 3)); i = hc + 3; continue; }
+      }
+    }
+
+    /* ---- 普通字符 ---- */
+    if (c === '&') {
+      var ent = /^&[#a-zA-Z0-9]+;/.exec(src.slice(i));
+      if (ent) { push(ent[0]); i += ent[0].length; continue; }
+    }
+    push(esc(c));
+    i++;
+  }
+  return out;
+}
+
+/* 行内两段/三段折叠块 */
+function scanFold(src, i) {
+  var t = pair(src, i, '~[', ']');
+  if (!t) return null;
+  var j = t.end, open = false;
+  if (src[j] === ':') { open = true; j++; }
+  var body = pair(src, j, '[', ']');
+  if (!body) return null;
+  var third = pair(src, body.end, '[', ']');
+  return {
+    title: t.inner, body: body.inner,
+    close: third ? third.inner : null, open: open,
+    end: third ? third.end : body.end
+  };
+}
+function tryFoldInline(src, i, scope) {
+  var f = scanFold(src, i);
+  if (!f) return null;
+  if (f.close !== null) {
+    return { html: foldHtml(f.title, inline(f.body), f.close, f.open, false), end: f.end };
+  }
+  return { html: foldHtml(f.title, inline(f.body), undefined, f.open, false), end: f.end };
+}
+
+/* ---- 图表 ---- */
+var PALETTE = ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f', '#edc948', '#b07aa1'];
+function chartHtml(inner) {
+  var parts = inner.split(':');
+  var kind = (parts[0] || '').trim();
+  var dataStr = (parts[1] || '').trim();
+  var extra = parts.slice(2).join(':').trim();
+  var title = '';
+  var tm = /标题\s*=\s*([^;]*)/.exec(extra);
+  if (tm) title = tm[1].trim();
+  var nums = dataStr.split(/[,;]/).map(function (s) { return s.trim(); }).filter(Boolean);
+  var vals = nums.map(function (s) {
+    var v = Number(s);
+    if (!isNaN(v) && s !== '') return v;
+    try { var r = evalExpr(s, Object.create(null)); return Number(r) || 0; } catch (e) { return 0; }
+  });
+  var label = title ? esc(title) : esc(kind === '柱' ? '柱状图' : kind === '折' ? '折线图' : kind === '饼' ? '饼图' : '表格');
+  var aria = ' role="img" aria-label="' + label + '"';
+  if (kind === '柱') {
+    var max = Math.max.apply(null, vals.concat([1]));
+    var bars = vals.map(function (v) {
+      return '<div class="mb-bar" style="--mb-v:' + v + '"><span>' + v + '</span></div>';
+    }).join('');
+    return '<figure class="mb-chart mb-chart-bar" style="--mb-max:' + max + '"' + aria + '>' + bars + '</figure>';
+  }
+  if (kind === '折') {
+    var mx = Math.max.apply(null, vals.concat([1]));
+    var step = vals.length > 1 ? 100 / (vals.length - 1) : 0;
+    var pts = vals.map(function (v, k) {
+      return (k * step).toFixed(1) + ',' + (40 - (v / mx) * 40).toFixed(1);
+    }).join(' ');
+    return '<svg class="mb-chart" viewBox="0 0 100 40" preserveAspectRatio="none"' + aria + '>'
+         + '<polyline fill="none" stroke="currentColor" stroke-width="1" vector-effect="non-scaling-stroke" points="'
+         + pts + '"></polyline></svg>';
+  }
+  if (kind === '饼') {
+    var sum = vals.reduce(function (a, b) { return a + b; }, 0) || 1;
+    var off = 25, seg = '';
+    vals.forEach(function (v, k) {
+      var pct = (v / sum) * 100;
+      seg += '<circle cx="21" cy="21" r="15.9155" fill="none" stroke="' + PALETTE[k % PALETTE.length]
+           + '" stroke-width="10" stroke-dasharray="' + pct.toFixed(2) + ' ' + (100 - pct).toFixed(2)
+           + '" stroke-dashoffset="' + off.toFixed(2) + '"></circle>';
+      off -= pct;
+    });
+    return '<svg class="mb-chart mb-chart-pie" viewBox="0 0 42 42"' + aria + '>' + seg + '</svg>';
+  }
+  if (kind === '表') {
+    var rows = dataStr.split(';').map(function (r) { return r.split(','); }).filter(function (r) { return r.length; });
+    var h = '<table><thead><tr>' + rows[0].map(function (c) { return '<th>' + inline(c.trim()) + '</th>'; }).join('') + '</tr></thead><tbody>';
+    for (var r = 1; r < rows.length; r++) {
+      h += '<tr>' + rows[r].map(function (c) { return '<td>' + inline(c.trim()) + '</td>'; }).join('') + '</tr>';
+    }
+    return h + '</tbody></table>';
+  }
+  warn('未知的图表类型：' + kind);
+  return esc('{[' + inner + ']}');
+}
+
+/* ==================================================================
+   4. 表格
+   ================================================================== */
+function splitRow(line) {
+  // 按 | 切分，跳过行内代码段里的 |
+  var cells = [], cur = '', k = 0, n = line.length, hasLead = false;
+  if (line[0] === '|') { hasLead = true; k = 1; }
+  while (k < n) {
+    var c = line[k];
+    if (c === '\\') { cur += line.slice(k, k + 2); k += 2; continue; }
+    if (c === '`') {
+      var t = 0; while (line[k + t] === '`') t++;
+      var fence = '`'.repeat(t), e = line.indexOf(fence, k + t);
+      if (e >= 0) { cur += line.slice(k, e + t); k = e + t; continue; }
+    }
+    if (line.startsWith('{|', k)) {                  // 排版调整语句整个跳过
+      var lo = line.indexOf('|}', k + 2);
+      if (lo >= 0) { cur += line.slice(k, lo + 2); k = lo + 2; continue; }
+    }
+    if (c === '|') { cells.push(cur); cur = ''; k++; continue; }
+    cur += c; k++;
+  }
+  if (cur.trim() !== '' || line[line.length - 1] !== '|') cells.push(cur);
+  return cells;
+}
+function isDelimRow(line) {
+  return /^\s*\|?[\s:|-]*-[\s:|-]*\|[\s:|-]*$/.test(line) && /-/.test(line) && /\|/.test(line);
+}
+function tableAlign(line) {
+  return splitRow(line).map(function (s) {
+    s = s.trim();
+    var l = s[0] === ':', r = s[s.length - 1] === ':';
+    return l && r ? 'center' : r ? 'right' : l ? 'left' : '';
+  });
+}
+
+/* 斜线单元格 */
+function slashCell(text) {
+  var m = /^%\(([\s\S]*)\)%$/.exec(text);                 // 两侧都有 % → 非法
+  if (m) {
+    warn('斜线单元格两侧都写了 “%”，已按普通文字输出：' + text);
+    return null;
+  }
+  var left = /^%\(([\s\S]*)\)$/.exec(text);
+  var right = /^\(([\s\S]*)\)%$/.exec(text);
+  if (!left && !right) return null;
+  var body = (left ? left[1] : right[1]);
+  var isBack = body.indexOf('\\') >= 0;
+  var segs = body.split(isBack ? '\\' : '/').map(function (s) { return s.trim(); });
+  if (segs.length < 2) return null;
+  // 汇聚角：左侧的 % 配 / 在左下、配 \ 在左上；右侧的 % 配 / 在右上、配 \ 在右下
+  var corner = (isBack ? (left ? 't' : 'b') : (left ? 'b' : 't')) + (left ? 'l' : 'r');
+  var fan = slashFan(corner, segs.length);
+  var cls = 'mb-slash ' + (isBack ? 'mb-slash-d' : 'mb-slash-u');
+  var h = '';
+  // 线
+  if (fan.rays.length > 1) {
+    h += '<svg class="mb-slash-fan" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">'
+       + fan.rays.slice(1).map(function (r) {
+           return '<line x1="' + fan.c.x * 100 + '" y1="' + fan.c.y * 100
+                + '" x2="' + (r[0] * 100).toFixed(2) + '" y2="' + (r[1] * 100).toFixed(2) + '"></line>';
+         }).join('')
+       + '</svg>';
+  }
+  // 文本（按从左往右）
+  var order = fan.anchors.map(function (a, k) { return { a: a, k: k }; })
+                         .sort(function (p, q) { return p.a[0] - q.a[0]; });
+  order.forEach(function (o, pos) {
+    var role = pos === 0 ? 'head' : pos === segs.length - 1 ? 'tail' : 'mid';
+    h += '<span class="mb-slash-' + role + '" style="left:' + (o.a[0] * 100).toFixed(1) + '%;top:'
+       + (o.a[1] * 100).toFixed(1) + '%;transform:translate(-50%,-50%)">' + inline(segs[o.k]) + '</span>';
+  });
+  return { cls: cls, html: h };
+}
+/* 单位方格里，从汇聚角出发等分 90° 扇形的射线与各块的锚点 */
+function slashFan(corner, num) {
+  var C = { bl: [0, 1], tl: [0, 0], tr: [1, 0], br: [1, 1] }[corner];
+  var E1 = { bl: [0, -1], tl: [1, 0], tr: [0, 1], br: [-1, 0] }[corner];
+  var E2 = { bl: [1, 0], tl: [0, 1], tr: [-1, 0], br: [0, -1] }[corner];
+  function onSquare(px, py, dx, dy) {
+    var best = Infinity;
+    if (dx > 1e-9) best = Math.min(best, (1 - px) / dx);
+    if (dx < -1e-9) best = Math.min(best, (0 - px) / dx);
+    if (dy > 1e-9) best = Math.min(best, (1 - py) / dy);
+    if (dy < -1e-9) best = Math.min(best, (0 - py) / dy);
+    return [px + dx * best, py + dy * best];
+  }
+  var P = [];                                  // P[0] = 起始角点, P[num] = 结束角点
+  P.push(onSquare(C[0], C[1], E1[0], E1[1]));
+  for (var k = 1; k < num; k++) {
+    var f = (k / num) * (Math.PI / 2);
+    var dx = Math.cos(f) * E1[0] + Math.sin(f) * E2[0];
+    var dy = Math.cos(f) * E1[1] + Math.sin(f) * E2[1];
+    P.push(onSquare(C[0], C[1], dx, dy));
+  }
+  P.push(onSquare(C[0], C[1], E2[0], E2[1]));
+  var anchors = [], rays = [];
+  for (var r = 1; r < num; r++) rays.push(P[r]);
+  for (var g = 0; g < num; g++) {
+    anchors.push([(C[0] + P[g][0] + P[g + 1][0]) / 3, (C[1] + P[g][1] + P[g + 1][1]) / 3]);
+  }
+  return { c: { x: C[0], y: C[1] }, rays: rays, anchors: anchors };
+}
+
+/* 渲染一张表（含侧边表头、延续符、斜线、折叠块） */
+function renderTable(rowTexts, aligns, folds, folded) {
+  folds = folds || [];
+  folded = folded || [];
+  /* 1. 切成单元格；|| 留下的空占位用于标记侧边表头 */
+  var grid = rowTexts.map(function (t) {
+    var cells = splitRow(t), marker = -1;
+    for (var q = 0; q < cells.length; q++) if (cells[q].trim() === '') { marker = q; break; }
+    var list = cells.slice();
+    if (marker >= 0) list.splice(marker, 1);
+    return {
+      sideCount: marker < 0 ? 0 : marker,
+      cells: list.map(function (s) { return { text: s.trim(), colspan: 1, rowspan: 1, dead: false, side: false }; })
+    };
+  });
+  grid.forEach(function (row) {
+    row.cells.forEach(function (c, k) { if (k < row.sideCount) c.side = true; });
+  });
+  /* 2. colspan（[+>] 与左边合并） */
+  grid.forEach(function (row) {
+    var last = null;
+    row.cells.forEach(function (c) {
+      if (c.text === '[+>]' && last) { last.colspan++; c.dead = true; }
+      else last = c;
+    });
+  });
+  /* 3. rowspan（[+] 与上边合并）——按“逻辑列”向上找最近的活单元格 */
+  function cellAbove(r, col) {
+    for (var rr = r - 1; rr >= 0; rr--) {
+      var cells = grid[rr].cells;
+      for (var q = 0; q < cells.length; q++) {
+        var u = cells[q];
+        if (u._col <= col && col < u._col + u.colspan) {
+          if (!u.dead) return u;
+          break;                                  // 这一格已被并掉 → 继续往上找
+        }
+      }
+    }
+    return null;
+  }
+  grid.forEach(function (row, r) {
+    var col = 0;
+    row.cells.forEach(function (c) { c._col = col; col += c.colspan; });
+    if (!r) return;
+    row.cells.forEach(function (c) {
+      if (c.text !== '[+]') return;
+      var up = cellAbove(r, c._col);
+      if (up) { up.rowspan++; c.dead = true; }
+    });
+  });
+  /* 4. 输出每一行 */
+  var rowsHtml = grid.map(function (row, r) {
+    var head = (r === 0), html = '', k = 0;
+    row.cells.forEach(function (c) {
+      if (c.dead) return;
+      var tag = (head || c.side) ? 'th' : 'td';
+      var attrs = '', clsList = [];
+      // 跨行一律按“原始跨度”给：被折叠的行仍然留在表格里（见 .mb-fold-off），
+      // 所以 rowspan 不需要也不应该按“看得见的行数”去减
+      if (c.rowspan > 1) attrs += ' rowspan="' + c.rowspan + '"';
+      if (c.colspan > 1) attrs += ' colspan="' + c.colspan + '"';
+      if (c.side) attrs += (head ? ' scope="col"' : ' scope="row"');   // 表头那一格是列标题
+      /* 单元格末尾的命名语句 / aria-label：修改该单元格 */
+      var text = c.text;
+      var ncm = /^(.*?)\s*\{([#.][^}]*)\}\s*$/.exec(text);
+      if (ncm) { attrs += namesAttrs([ncm[2]]); text = ncm[1].trim(); }
+      var acm = /^(.*?)\s*\(\(([^()]*)\)\)\s*$/.exec(text);
+      if (acm) { attrs += ' aria-label="' + esc(acm[2]) + '"'; text = acm[1].trim(); }
+      /* 单元格末尾的排版调整语句：修改该单元格 */
+      var tcm = /^(.*?)\s*\{\|([^}]*)\|\}\s*$/.exec(text);
+      if (tcm) {
+        var lcc = layoutClasses(tcm[2]);
+        if (lcc.length) { text = tcm[1].trim(); clsList = clsList.concat(lcc); }
+      }
+      var al = aligns[k];
+      if (al) attrs += ' style="text-align:' + al + '"';
+      var sl = slashCell(text);
+      if (sl) clsList.push(sl.cls);
+      if (clsList.length) attrs = ' class="' + clsList.join(' ') + '"' + attrs;
+      html += '<' + tag + attrs + '>' + (sl ? sl.html : inline(text)) + '</' + tag + '>';
+      k += c.colspan;
+    });
+    return { html: html, attrs: '' };
+  });
+  /* 5. 把折叠块挂上去 */
+  folds.forEach(function (f) {
+    var id = uid('tfold');
+    var anchor = f.startRow - 1;
+    var first = splitRow(rowTexts[f.rows[0]]), marker = -1;
+    for (var q = 0; q < first.length; q++) if (first[q].trim() === '') { marker = q; break; }
+    if (marker >= 0) first.splice(marker, 1);
+    var colIdx = 0;
+    for (var q2 = 0; q2 < first.length; q2++) {
+      var v = first[q2].trim();
+      if (v !== '[+]' && v !== '[+>]' && v !== '') { colIdx = q2; break; }
+    }
+    var marked = '<input type="checkbox" class="mb-fold-state" id="' + id + '" data-mb-rows="' + id + '">'
+               + '<label class="mb-fold-title" for="' + id + '">' + inline(f.title) + '</label>';
+    if (rowsHtml[anchor]) {
+      var seg = rowsHtml[anchor].html, n2 = 0, ins = -1, m2;
+      var re2 = /<t[dh][^>]*>/g;
+      while ((m2 = re2.exec(seg))) { if (n2++ === colIdx) { ins = m2.index + m2[0].length; break; } }
+      if (ins >= 0) {
+        var shut = seg.indexOf('</t', ins);        // 按钮放在该单元格内容的末尾
+        if (shut < 0) shut = ins;
+        rowsHtml[anchor].html = seg.slice(0, shut) + marked + seg.slice(shut);
+      }
+    }
+    f.rows.forEach(function (r) {
+      if (rowsHtml[r]) rowsHtml[r].attrs += ' data-mb-fold="' + id + '" class="mb-fold-off"';
+    });
+  });
+  /* 5b. 分离式折叠块盖住的行 */
+  folded.forEach(function (fd) {
+    if (rowsHtml[fd.row]) rowsHtml[fd.row].attrs += ' data-mb-fold="' + esc(fd.id) + '" class="mb-fold-off"';
+  });
+  /* 6. 拼成 table */
+  var h = '<table>\n';
+  if (rowsHtml.length) h += '<thead><tr>' + rowsHtml[0].html + '</tr></thead>\n<tbody>\n';
+  for (var r2 = 1; r2 < rowsHtml.length; r2++) {
+    h += '<tr' + rowsHtml[r2].attrs + '>' + rowsHtml[r2].html + '</tr>\n';
+  }
+  return h + '</tbody></table>\n';
+}
+
+/* ==================================================================
+   5. 块级解析
+   ================================================================== */
+function isBlank(s) { return !/\S/.test(s); }
+function looksLikeTable(lines, i) {
+  if (i + 1 >= lines.length) return false;
+  if (!lines[i].includes('|')) return false;
+  return isDelimRow(lines[i + 1]);
+}
+function collectTable(lines, i) {
+  var rows = [], folds = [], j = i;
+  rows.push(lines[j]); j++;                       // 表头
+  j++;                                            // 分隔行
+  var pending = null, folded = [], loose = [];
+  while (j < lines.length) {
+    var L = lines[j];
+    if (isBlank(L)) break;
+    /* 分离式折叠块的内容区：[id]~>[ … ] */
+    var fs = isFoldContentStart(L, true);       // 宽松：标识符对不上也要认出来，免得切断表格
+    var rc = fs ? readFoldContent(lines, j, fs[2]) : null;
+    var tableish = rc && rc.lines.some(function (ln) { return /^\s*\|/.test(ln); });
+    if (rc && rc.ok && tableish) {
+      var fidC = foldId(fs[1]);
+      var matched = !!FOLD_IDS[fs[1]];           // 有没有对应的按钮
+      var absorbed = 0, rest = [], inTable = true;
+      rc.lines.forEach(function (ln, idx) {
+        if (ln.trim() === '') {                 // 空行：已经并过行就表示“表格到此为止”
+          if (absorbed) inTable = false;
+          return;
+        }
+        if (idx === 0 && !/^\s*\|/.test(ln)) {  // `[id]~>[` 后面剩的零碎文字：不算一行、也不结束表格
+          rest.push(ln);
+          return;
+        }
+        if (inTable && /^\s*\|/.test(ln)) {
+          rows.push(ln);
+          // 没有按钮就别藏，免得内容再也出不来（compile 里会给出提醒）
+          if (matched) folded.push({ id: fidC, row: rows.length - 1 });
+          absorbed++;
+        } else {
+          inTable = false; rest.push(ln);
+        }
+      });
+      j = rc.next;
+      if (rest.length) loose.push({ id: fidC, lines: rest });
+      if (!absorbed) break;                       // 内容里没有表格行 → 表格到此为止
+      continue;
+    }
+    var t = L.trim();
+    if (/^~\[/.test(t)) {                         // 折叠块开始（一行）
+      var fo = pair(L, L.indexOf('~['), '~[', ']');
+      if (fo) {
+        pending = { title: fo.inner, startRow: rows.length, rows: [] };
+        j++; continue;
+      }
+    }
+    if (pending && /^\]/.test(t)) {               // 折叠块结束
+      folds.push(pending); pending = null; j++; continue;
+    }
+    if (!/\|/.test(L)) break;
+    rows.push(L);
+    if (pending) pending.rows.push(rows.length - 1);
+    j++;
+  }
+  return { rows: rows, folds: folds, folded: folded, loose: loose, next: j };
+}
+/* 折叠块已经并入 renderTable，这里只留一个薄封装 */
+function renderFoldTable(rows, folds, aligns) {
+  return renderTable(rows, aligns, folds);
+}
+
+function parseBlocks(lines) {
+  var out = [], i = 0, n = lines.length, pendingName = null, nameMark = 0, pendingSkip = 0;
+  while (i < n) {
+    var line = lines[i];
+    if (isBlank(line)) { i++; continue; }
+
+    /* 代码块 */
+    var fm = /^\s*(```+|~~~+)\s*([^\s`]*)\s*$/.exec(line);
+    if (fm) {
+      var fence = fm[1][0].repeat(3), lang = fm[2];
+      var buf = [], j = i + 1, skipFence = pendingSkip;
+      pendingSkip = 0;
+      var closeRe = new RegExp('^\\s*' + fence + '\\s*$');
+      while (j < n) {
+        if (closeRe.test(lines[j])) {
+          if (skipFence > 0) { skipFence--; buf.push(lines[j]); j++; continue; }
+          break;
+        }
+        buf.push(lines[j]); j++;
+      }
+      out.push('<pre><code' + (lang ? ' class="language-' + esc(lang) + '"' : '') + '>'
+               + esc(buf.join('\n')) + '</code></pre>');
+      i = j + 1; continue;
+    }
+
+    /* 解析语句 {/`=n} —— 只影响紧随其后的那一个块 */
+    var pm = /^\s*\{\/`(?:=(\d*))?\}\s*$/.exec(line);
+    if (pm) {
+      pendingSkip = (pm[1] === undefined || pm[1] === '') ? 1 : parseInt(pm[1], 10);
+      i++; continue;
+    }
+
+    /* 把上一轮单独成行的命名语句 / aria-label 作用到它下面的块上 */
+    if (pendingName && out.length > nameMark) {
+      out[nameMark] = injectAttrsRaw(out[nameMark], pendingName);
+      pendingName = null;
+    }
+
+    /* 命名语句 / aria-label 单独成行：作用到【它上面】的那个块
+       （上面还没有块时才作用到下面的块——旧写法兼容） */
+    var solo = /^\s*\{([#.][^}]*)\}\s*$/.exec(line);
+    var soloAria = solo ? null : /^\s*\(\(([^()]*)\)\)\s*$/.exec(line);
+    if (solo || soloAria) {
+      var soloAttr = solo ? nameAttrs(solo[1]) : ' aria-label="' + esc(soloAria[1]) + '"';
+      if (out.length) out[out.length - 1] = injectAttrsRaw(out[out.length - 1], soloAttr);
+      else { pendingName = soloAttr; nameMark = 0; }
+      i++; continue;
+    }
+
+    /* 标题（末尾可以跟命名语句，如 `#标题1 {#t1}`） */
+    var hm = /^(#{1,6})\s+(.*)$/.exec(line);
+    if (hm) {
+      var hs = { attrs: [] };
+      var hbody = inline(hm[2].replace(/\s+#+\s*$/, ''), hs);
+      var hattr = hs.attrs.join('');
+      out.push('<h' + hm[1].length + hattr + '>' + hbody + '</h' + hm[1].length + '>');
+      i++; continue;
+    }
+
+    /* 分隔线 */
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) { out.push('<hr>'); i++; continue; }
+
+    /* 引用块 */
+    if (/^\s*>/.test(line)) {
+      var q = [];
+      while (i < n && /^\s*>/.test(lines[i])) { q.push(lines[i].replace(/^\s*>\s?/, '')); i++; }
+      out.push('<blockquote>\n' + parseBlocks(q) + '</blockquote>\n');
+      continue;
+    }
+
+    /* 表格 */
+    if (looksLikeTable(lines, i)) {
+      var tb = collectTable(lines, i);
+      out.push(renderTable(tb.rows, tableAlign(lines[i + 1]), tb.folds, tb.folded));
+      tb.loose.forEach(function (lo) {              // 折叠内容里不是表格行的部分
+        out.push('<div class="mb-fold-body" data-mb-fold="' + esc(lo.id) + '" hidden>\n'
+                 + parseBlocks(lo.lines) + '</div>\n');
+      });
+      i = tb.next; continue;
+    }
+
+    /* 定义列表 */
+    if (i + 1 < n && /^\s*[:：]\s+/.test(lines[i + 1])) {
+      var dl = '<dl>\n', term = line;
+      while (i < n && /^\s*[:：]\s+/.test(lines[i])) {
+        dl += '<dt>' + inline(term) + '</dt><dd>' + inline(lines[i].replace(/^\s*[:：]\s+/, '')) + '</dd>\n';
+        i++;
+        if (i < n && !isBlank(lines[i]) && !/^\s*[:：]\s+/.test(lines[i])) term = lines[i++]; else break;
+      }
+      out.push(dl + '</dl>\n'); continue;
+    }
+
+    /* 脚注定义 */
+    var fdm = /^\[\^([^\]]+)\]:\s*(.*)$/.exec(line);
+    if (fdm) {
+      var fb = [fdm[2]];
+      i++;
+      while (i < n && !isBlank(lines[i]) && /^\s{2,}/.test(lines[i])) { fb.push(lines[i].trim()); i++; }
+      footnotes.push({ key: fdm[1], text: fb.join(' ') });
+      continue;
+    }
+
+    /* 列表 */
+    if (/^\s*([-*+]|\d+[.)])\s+/.test(line)) {
+      var res = parseList(lines, i);
+      out.push(res.html); i = res.next; continue;
+    }
+
+    /* 分离式折叠块的内容区：[标识符]~>[ … ]（不在表格 / 列表里时） */
+    var fsb = isFoldContentStart(line);
+    if (fsb) {
+      var rcb = readFoldContent(lines, i, fsb[2]);
+      if (rcb.ok) {                               // 少了收尾的 ] → 落到下面按普通文本处理
+        out.push('<div class="mb-fold-body" data-mb-fold="' + esc(foldId(fsb[1])) + '" hidden>\n'
+                 + parseBlocks(rcb.lines) + '</div>\n');
+        i = rcb.next; continue;
+      }
+    }
+
+    /* 折叠块（块级） */
+    if (/^\s*~\[/.test(line)) {
+      var fo = parseFoldBlock(lines, i);
+      if (fo) { out.push(fo.html); i = fo.next; continue; }
+    }
+
+    /* 单独成行的执行语句：交给 inline 走一遍（它会把 {{a}}{{b}} 规范成 {{a}{b}}） */
+    if (/^\s*\{\{[\s\S]*\}\}\s*$/.test(line.trim())) {
+      out.push('<p>' + inline(line.trim(), { attrs: [] }) + '</p>');
+      i++; continue;
+    }
+    /* 排版调整语句单独成行 */
+    var lay = /^\s*\{\|([^}]*)\|\}\s*$/.exec(line);
+    if (lay) {
+      var code = lay[1];
+      var buf2 = [], j2 = i + 1;
+      while (j2 < n && !isBlank(lines[j2])
+             && !/^\s*(#{1,6}\s|>|~\[|\{\{|\{\||\{[#.]|```|~~~|[-*+]\s|\d+[.)]\s)/.test(lines[j2])) {
+        buf2.push(lines[j2]); j2++;
+      }
+      out.push(layoutWrap(code, buf2.length ? parseBlocks(buf2) : ''));
+      i = j2; continue;
+    }
+
+    /* 段落 */
+    var para = [];
+    while (i < n && !isBlank(lines[i]) && !/^\s*(#{1,6}\s|>|~\[|\{\{|\{\||\{[#.]|\[[A-Za-z0-9_-]+\]~>\[|```|~~~)/.test(lines[i])
+           && !looksLikeTable(lines, i) && !/^\s*([-*+]|\d+[.)])\s+/.test(lines[i])) {
+      para.push(lines[i]); i++;
+    }
+    if (!para.length) { para.push(lines[i]); i++; }
+    var pSkip = pendingSkip; pendingSkip = 0;
+    /* 行尾的排版调整语句：修改这一行所属的块 */
+    var pCls = [], lastIdx = para.length - 1;
+    var tl = /^(.*?)\s*\{\|([^}]*)\|\}\s*$/.exec(para[lastIdx]);
+    if (tl) {
+      var lcs = layoutClasses(tl[2]);
+      if (lcs.length) { pCls = lcs; para[lastIdx] = tl[1]; }
+    }
+    var sc = { attrs: [] };
+    var text = para.map(function (l, k) {
+      var hard = /\s\s$/.test(l);
+      return inline(l.replace(/\s+$/, ''), sc, k === 0 ? pSkip : 0)
+           + (hard && k < para.length - 1 ? '<br>' : '');
+    }).join('\n');
+    var pattr = sc.attrs.join('');
+    if (pCls.length) {
+      pattr = /class="/.test(pattr)
+        ? pattr.replace(/class="([^"]*)"/, 'class="$1 ' + pCls.join(' ') + '"')
+        : ' class="' + pCls.join(' ') + '"' + pattr;
+    }
+    out.push('<p' + pattr + '>' + text + '</p>\n');
+  }
+  return out.join('\n');
+}
+
+function layoutClasses(code) {
+  var cls = [];
+  if (/:---:/.test(code)) cls.push('mb-center');
+  else if (/:---/.test(code)) cls.push('mb-left');
+  else if (/---:/.test(code)) cls.push('mb-right');
+  if (/===/.test(code)) cls.push('mb-block');
+  else if (/-\.[\d.]*-/.test(code)) cls.push('mb-inline-middle');
+  else if (/--\./.test(code)) cls.push('mb-float-right');
+  else if (/\.[\d.]*--/.test(code)) cls.push('mb-float-left');
+  return cls;
+}
+function layoutWrap(code, inner) {
+  var cls = layoutClasses(code);
+  if (!cls.length) return inner;
+  var nm = /\.(\d+(?:\.\d+)?)/.exec(code);
+  var style = (nm && cls.some(function (c) { return /float|inline-middle/.test(c); }))
+    ? ' style="height: ' + nm[1] + 'em"' : '';
+  return '<div class="' + cls.join(' ') + '"' + style + '">\n' + inner + '</div>\n';
+}
+
+function parseFoldBlock(lines, i) {
+  var line = lines[i], start = line.indexOf('~[');
+  /* 单行形式 ~[标题][正文] / ~[标题]:[正文] / ~[标题][正文][收起] */
+  var one = scanFold(line, start);
+  if (one && !/\S/.test(line.slice(one.end))) {
+    return {
+      html: foldHtml(one.title, parseBlocks(one.body.split('\n')), one.close, one.open, true),
+      next: i + 1
+    };
+  }
+  /* 多行形式：到“以 ] 开头的那一行”为止 */
+  var t = pair(line, start, '~[', ']');
+  if (!t) return null;
+  var rest = line.slice(t.end), open = false;
+  if (rest[0] === ':') { open = true; rest = rest.slice(1); }
+  var body = [], j = i + 1;
+  if (rest.trim() !== '') {
+    var lb = pair(rest, rest.indexOf('['), '[', ']');
+    if (lb) body.push(lb.inner);
+  }
+  var endMark = null;
+  while (j < lines.length) {
+    if (/^\s*\]/.test(lines[j])) { endMark = lines[j]; j++; break; }
+    body.push(lines[j]); j++;
+  }
+  var closeText;
+  if (endMark) {
+    var cm = /^\s*\]\s*\[([\s\S]*)\]\s*$/.exec(endMark);
+    closeText = cm ? cm[1] : '';
+  }
+  return {
+    html: foldHtml(t.inner, parseBlocks(body), closeText, open, true),
+    next: j
+  };
+}
+
+function parseList(lines, i) {
+  var ordered = /^\s*\d+[.)]\s+/.test(lines[i]);
+  var baseIndent = lines[i].match(/^\s*/)[0].length;
+  var ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+  var items = [];
+  while (i < lines.length) {
+    var L = lines[i];
+    /* 分离式折叠块的内容区：吸进列表，折叠时隐藏对应的 <li> */
+    var fs = isFoldContentStart(L, true);       // 宽松：免得把列表切断
+    var rc = fs ? readFoldContent(lines, i, fs[2]) : null;
+    var listish = rc && rc.lines.some(function (ln) { return ITEM.test(ln); });
+    if (rc && rc.ok && listish) {
+      var fidL = foldId(fs[1]);
+      var matchedL = !!FOLD_IDS[fs[1]];
+      rc.lines.forEach(function (ln) {
+        var mI = ITEM.exec(ln);
+        if (mI) items.push({ content: [mI[3]], fid: matchedL ? fidL : null });
+      });
+      i = rc.next; continue;
+    }
+    var mm = ITEM.exec(L);
+    if (!mm) break;
+    var indent = mm[1].length;
+    if (indent !== baseIndent) break;            // 缩进不同 → 交给内层或结束
+    var content = [mm[3]];
+    i++;
+    // 收集该项的后续行（缩进的续行 / 嵌套列表）
+    while (i < lines.length) {
+      var L2 = lines[i];
+      if (isBlank(L2)) {
+        if (i + 1 < lines.length && /^\s{2,}\S/.test(lines[i + 1])) { content.push(''); i++; continue; }
+        break;
+      }
+      var ind2 = L2.match(/^\s*/)[0].length;
+      if (ind2 > baseIndent) { content.push(L2.slice(Math.min(ind2, baseIndent + 2))); i++; continue; }
+      break;
+    }
+    items.push({ content: content, fid: null });
+    if (i < lines.length && isBlank(lines[i])) {
+      var k = i + 1;
+      while (k < lines.length && isBlank(lines[k])) k++;
+      if (k < lines.length) {
+        var m2 = ITEM.exec(lines[k]);
+        if (m2 && m2[1].length === baseIndent) { i = k; continue; }
+      }
+      i = k - 1; break;
+    }
+  }
+  var tag = ordered ? 'ol' : 'ul';
+  var h = '<' + tag + '>\n';
+  items.forEach(function (it) {
+    var content = it.content, first = content[0], box = '';
+    var cm = /^\[([ xX])\]\s+([\s\S]*)$/.exec(first);
+    if (cm) { box = '<input type="checkbox" disabled' + (cm[1] !== ' ' ? ' checked' : '') + '> '; first = cm[2]; }
+    var rest = content.slice(1);
+    var lsc = { attrs: [] };          // 列表项末尾的命名语句 / aria-label 作用于这个 <li>
+    var inner = inline(first, lsc);
+    h += '<li' + (it.fid ? ' data-mb-fold="' + esc(it.fid) + '" hidden' : '')
+       + lsc.attrs.join('') + '>' + box + inner;
+    if (rest.length) {
+      var sub = parseBlocks(rest);
+      h += (sub.indexOf('<p>') === 0 ? '' : '\n') + sub;
+    }
+    h += '</li>\n';
+  });
+  return { html: h + '</' + tag + '>\n', next: i };
+}
+
+/* ==================================================================
+   6. 编译入口
+   ================================================================== */
+var footnotes = [];
+function compile(src) {
+  warnings = []; footnotes = [];
+  tickClock();
+  var lines = src.replace(/\r\n?/g, '\n').split('\n');
+  collectFoldIds(src);
+  // 折叠块的写法检查：给出明确的报错提示，而不是悄悄把表格切断
+  lines.forEach(function (ln) {
+    var head = RE_FOLD_HEAD.exec(ln);
+    if (head && !FOLD_IDS[head[1].trim()]) {
+      warn('发现折叠内容区 `[' + head[1].trim() + ']~>[`，但没有找到对应的按钮 `~[标题]~>['
+         + head[1].trim() + ']`——两处的标识符必须完全一样');
+    }
+    var noTilde = /\[([^\]\n]+?)\]\s*[~～]\s*[>＞]\s*\[([^\]\n]+?)\]/.exec(ln);
+    if (noTilde) {
+      var before = ln.charAt(noTilde.index - 1);
+      if (before !== '~' && before !== '～' && !FOLD_IDS[noTilde[2].trim()]) {
+        warn('`' + noTilde[0] + '` 看起来像折叠按钮，但少了开头的 `~`——按钮写成 `~[标题]~>[标识符]`，'
+           + '`~` 不能省略，现在这里按普通文本输出');
+      }
+    }
+    /* 命名语句要写在元素【后面】（见标准 3.1）。写在前面是旧写法，提示一下 */
+    if (/^\s*\{[#.][^}]*\}\s*\S/.test(ln)) {
+      warn('命名语句写在了元素前面：应写成「元素 {#id}」（见 3.1）——`' + ln.trim().slice(0, 24)
+         + '` 现在仍按旧写法作用到本块上');
+    }
+  });
+  // 首行版本/语言声明
+  if (lines.length && /^\s*\{\{v:[^}]*\}/.test(lines[0])) lines.shift();
+  var html = parseBlocks(lines);
+  if (footnotes.length) {
+    html += '\n<section class="mb-footnotes">\n<ol>\n' + footnotes.map(function (f) {
+      return '<li id="fn-' + esc(f.key) + '">' + inline(f.text) + '</li>';
+    }).join('\n') + '\n</ol>\n</section>\n';
+  }
+  return html;
+}
+function fullHtml(body, title) {
+  return '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n'
+       + '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+       + '<title>' + esc(title || 'MarkBottom 文档') + '</title>\n<style>\n'
+       + document.getElementById('stdCss').textContent.trim() + '\n</style>\n'
+       + '</head>\n<body class="mb-doc">\n' + body
+       + '\n<script>\n' + document.getElementById('stdJs').textContent.trim() + '\n<\/script>\n'
+       + '</body>\n</html>\n';
+}
+
+/* ==================================================================
+   7. 界面
+   ================================================================== */
+var SAMPLE = [
+'{{v:0.1}{l:"zh_CN"}}',
+'# MarkBottom 演示 {#demo}',
+'',
+'> 这是一个最小的 mbmd 示例，用来检查转换器。',
+'',
+'## ruby 与行内样式',
+'',
+'【振仮名|ふりがな】 / 【振仮名/ふりがな】 / 【紅玉|モミだま/ルビ】',
+'',
+'**粗体**、*斜体*、_下划线_、~~删除线~~',
+'',
+'着重点：【一般标在上方|】、【一般标在下方/】',
+'',
+'<-[变大]-> 与 ->[变小]<-，上标 x^[2]^，下标 y_[1]_，@(灰)@，_(夹注)_，#(剧透)#，',
+"!'上色'!，!,背景,!，!.荧光笔.!，!;前+背;!，!:前+荧:!",
+'',
+'竖排（两列，默认从右到左）： 「「右列『『in』』文字',
+'左列文字」」',
+'',
+'## 功能语句',
+'',
+'内容语句：{:greek:alpha:} {:unicode:1F600:} {:control:copy:} {:emoji:smile:}',
+'',
+'计算语句：1 + 1 = {`1+1`}，7 % 3 = {`7%3`}，拼接 {`"a"+:"b"`}',
+'',
+'略过结束标识：{/`=2}`a`b`c`',
+'',
+'行尾对齐：这一整段右对齐{|:---:|}',
+'',
+'| 左 | 中 | 右 |',
+'|---|---|---|',
+'| 左对齐{|:---|}| 居中{|:---:|}| 右对齐{|---:|} |',
+'',
+'变量：现在是 {$timeY$}-{$timeM$}-{$timeD$} {$timeh$}:{$timem$}:{$times$}',
+'',
+'按钮：[[点我]{{put:"你好，世界！"}}]',
+'',
+'输入框：::你的名字: :[请输入](小明)->(#go1){{put:"欢迎，"+:$cntnt$}}',
+'',
+'[[执行]{{put:"（来自按钮）"}}]{#go1}',
+'',
+'## trigger / call / use',
+'',
+'{{trigger:"flag"}}{{put:"hello"}}  ←这句里的 put 不会执行，先被记在 flag 名下',
+'',
+'{{call:"flag"}}  ←在“原位置”执行：hello 出现在上面那一句的地方',
+'',
+'{{use:"flag"}}  ←在“这里”执行：hello 出现在这一句后面',
+'',
+'## 折叠块',
+'',
+'一般折叠块（块级，放在段落之间）：',
+'',
+'~[点我展开][里面是一堆文本。]',
+'',
+'分离式折叠块：按钮 `~[标题]~>[标识符]`（开头的 `~` 不能省），内容 `[标识符]~>[ … ]`（方括号也不能省）',
+'',
+'折叠表格行（收尾的 `]` 不结束表格，它后面的行仍属于同一张表）：',
+'',
+'|语法 |示例 |',
+'|---|---|',
+'| ruby | `【基字|上标】` |',
+'|[+]| ~[其他写法]~>[f-ruby] |',
+'[f-ruby]~>[',
+'|[+]| `[(基字|上标)]` |',
+'|[+]| `【基字｜上标】` |',
+']',
+'',
+'折叠表格行：',
+'',
+'|列 A |列 B |',
+'|---|---|',
+'| 正常行 | ~[展开]~>[f-tbl] |',
+'[f-tbl]~>[',
+'| 隐藏行一 | 内容一 |',
+'| 隐藏行二 | 内容二 |',
+']',
+'',
+'折叠列表项：',
+'',
+'- 列表第一项 ~[展开]~>[f-list]',
+'[f-list]~>[',
+'- 被折叠的第二项',
+'- 被折叠的第三项',
+']',
+'',
+'## 表格扩充',
+'',
+'| ( 语法 \\ 示例 )% || 上标 | 下标 |',
+'|---|---|---|',
+'| ruby | `【基字\\|上标】` | `【基字/下标】` |',
+'| 变大 | `<-[x]->` | `+[x]+` |',
+'| [+] | 上标/下标都可以写成全角 | `｜` 与 `／` |',
+'',
+'## 图表',
+'',
+'{[柱:3,5,2,8]}',
+'',
+'{[饼:30,20,50]}',
+'',
+'## 脚注与列表',
+'',
+'- [x] 已完成的任务',
+'- [ ] 未完成的任务[^1]',
+'',
+'[^1]: 这是一个脚注。'
+].join('\n');
+
+/* 这一版的标记：换了新文件后，标题栏右边会显示它——用来确认你跑的不是旧文件 */
+var BUILD = 'build 2026-09-27i';
+var $ = function (id) { return document.getElementById(id); };
+var input = $('in'), out = $('out'), srcbox = $('srcbox'), srccode = $('srccode'), log = $('log');
+var lastHtml = '';
+$('ver').textContent = BUILD;
+
+function render() {
+  var src = input.value;
+  var body, err = null;
+  try { body = compile(src); } catch (e) { err = e; body = '<pre>' + esc(String(e.stack || e)) + '</pre>'; }
+  var tm = /^#\s+(.+)$/m.exec(src);
+  lastHtml = fullHtml(body, tm ? tm[1].replace(/\s*\{[#.][^}]*\}\s*$/, '') : undefined);
+  var compileLog = [BUILD].concat(err ? ['解析出错：' + err.message]
+    : warnings.map(function (w) { return '⚠ ' + w; }));
+  log.textContent = compileLog.join('\n');
+  // 预览加载完，再把“运行时实际做过什么”也显示到日志区（put / trigger / call / use / rplc）
+  out.onload = function () {
+    var w2 = out.contentWindow, m = w2 && w2.mb;
+    var lines = compileLog.slice();
+    if (m && m.log && m.log.length) {
+      lines = lines.concat(m.log.map(function (s) { return '· ' + s; }));
+    } else if (/{{/.test(src)) {
+      lines.push('（运行时没有报告任何动作——说明页面里的运行时没跑起来：'
+                 + '多半是转换器还是旧文件，请确认标题栏的 build 版本）');
+    }
+    log.textContent = lines.join('\n');
+  };
+  out.srcdoc = lastHtml;
+  srccode.textContent = lastHtml;
+  localStorage.setItem('mbmd.src', src);
+}
+
+var timer = null;
+input.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(render, 220); });
+
+$('file').addEventListener('change', function (e) {
+  var f = e.target.files[0]; if (!f) return;
+  var r = new FileReader();
+  r.onload = function () { input.value = r.result; render(); };
+  r.readAsText(f, 'utf-8');
+  e.target.value = '';
+});
+document.addEventListener('dragover', function (e) { e.preventDefault(); });
+document.addEventListener('drop', function (e) {
+  e.preventDefault();
+  var f = e.dataTransfer.files[0]; if (!f) return;
+  var r = new FileReader();
+  r.onload = function () { input.value = r.result; render(); };
+  r.readAsText(f, 'utf-8');
+});
+$('demo').addEventListener('click', function () { input.value = SAMPLE; render(); });
+$('clear').addEventListener('click', function () { input.value = ''; render(); });
+$('viewPreview').addEventListener('click', function () {
+  out.style.display = 'block'; srcbox.style.display = 'none';
+  this.classList.add('on'); $('viewSource').classList.remove('on');
+  $('outTitle').textContent = '预览';
+});
+$('viewSource').addEventListener('click', function () {
+  out.style.display = 'none'; srcbox.style.display = 'block';
+  this.classList.add('on'); $('viewPreview').classList.remove('on');
+  $('outTitle').textContent = 'HTML 源码（生成的完整文件）';
+});
+$('copy').addEventListener('click', function () {
+  navigator.clipboard.writeText(lastHtml).then(function () {
+    var b = $('copy'), old = b.textContent;
+    b.textContent = '已复制 ✓'; setTimeout(function () { b.textContent = old; }, 1200);
+  });
+});
+$('download').addEventListener('click', function () {
+  var blob = new Blob([lastHtml], { type: 'text/html;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mbmd.html';
+  a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+});
+
+input.value = localStorage.getItem('mbmd.src') || SAMPLE;
+render();
+})();
+</script>
+</body>
+</html>

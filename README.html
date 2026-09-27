@@ -1,0 +1,2839 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MarkBottom 0.1 版本标准</title>
+<style>
+/* ===== 1. 必要的样式定义 ===== */
+.mb-ruby-under { ruby-position: under; }
+.mb-ruby-over  { ruby-position: over; }
+.mb-bigger { font-size: 150%; }
+.mb-smaller { font-size: 75%; }
+.mb-gray { opacity: 0.75; }
+.mb-commental { opacity: 0.75; font-size: 75%; }
+.mb-commental::before { opacity: 0.75; font-size: 75%; content: "("; }
+.mb-commental::after  { opacity: 0.75; font-size: 75%; content: ")"; }
+.mb-blacked { color: #444; background-color: #444; }
+.mb-blacked:hover { color: #eee; }
+.mb-fgcolored { color: var(--mbhighlightcolor, #26d); }
+.mb-bgcolored { background-color: var(--mbhighlightbgcolor, #ed6d); }
+.mb-bgpartialcolored {
+    background-image: linear-gradient(var(--mbhighlightbgcolor, #ed6d), var(--mbhighlightbgcolor, #ed6d));
+    background-repeat: no-repeat;
+    background-size: 100% 0.5em;
+    background-position: 0 calc(100% - 0em);
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+}
+
+/* ===== 1.1 新增语法所需的样式（必需） ===== */
+.mb-left   { text-align: left; }
+.mb-center { text-align: center; }
+.mb-right  { text-align: right; }
+.mb-block  { display: block; }
+.mb-float-right { float: right; clear: right; margin: 0 0 0.5em 0.5em; }
+.mb-float-left  { float: left;  clear: left;  margin: 0 0.5em 0.5em 0; }
+.mb-inline-middle { display: inline-block; vertical-align: middle; }
+
+.mb-vertical   { writing-mode: vertical-rl; display: inline-block; vertical-align: top; }
+.mb-horizontal { writing-mode: horizontal-tb; }
+
+.mb-origin { white-space: pre-wrap; }
+
+.mb-btn {
+    display: inline-block; padding: 0.1em 0.8em; border: 1px solid #aaa;
+    border-radius: 0.35em; background: #f4f4f4; color: inherit; font: inherit;
+    line-height: 1.6; text-decoration: none; cursor: pointer;
+}
+.mb-btn:hover  { background: #e9e9e9; }
+.mb-btn:active { background: #dedede; }
+
+.mb-input { font: inherit; padding: 0.1em 0.4em; border: 1px solid #aaa;
+            border-radius: 0.25em; background: #fff; color: inherit; }
+
+.mb-label { display: inline-flex; align-items: center; gap: 0.3em; cursor: pointer; }
+
+.mb-fold > summary { cursor: pointer; }
+
+.mb-fold-inline { display: inline; }
+.mb-fold-inline > .mb-fold-state {
+    position: absolute; width: 0; height: 0; margin: 0; opacity: 0; pointer-events: none;
+}
+.mb-fold-inline > .mb-fold-body,
+.mb-fold-inline > .mb-fold-close { display: none; }
+.mb-fold-inline > .mb-fold-state:checked ~ .mb-fold-body,
+.mb-fold-inline > .mb-fold-state:checked ~ .mb-fold-close { display: inline; }
+.mb-fold-inline > .mb-fold-state:checked ~ .mb-fold-title { display: none; }
+.mb-fold-title, .mb-fold-close { cursor: pointer; font: inherit; }
+.mb-fold-title::before { content: "▶ "; }
+
+.mb-fold-block > .mb-fold-state {
+    position: absolute; width: 0; height: 0; margin: 0; opacity: 0; pointer-events: none;
+}
+.mb-fold-block > .mb-fold-body,
+.mb-fold-block > .mb-fold-close { display: none; }
+.mb-fold-block > .mb-fold-state:checked ~ .mb-fold-body { display: block; }
+.mb-fold-block > .mb-fold-state:checked ~ .mb-fold-close { display: block; }
+.mb-fold-block > .mb-fold-state:checked ~ .mb-fold-title { display: none; }
+
+.mb-slash { position: relative; }
+.mb-slash::before {
+    content: ""; position: absolute; inset: 0; background-size: 100% 100%;
+    background-repeat: no-repeat; pointer-events: none;
+}
+.mb-slash-u::before {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><line x1="0" y1="100" x2="100" y2="0" stroke="%23bbb" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>');
+}
+.mb-slash-d::before {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><line x1="0" y1="0" x2="100" y2="100" stroke="%23bbb" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>');
+}
+.mb-slash > .mb-slash-head,
+.mb-slash > .mb-slash-mid,
+.mb-slash > .mb-slash-tail {
+    position: absolute; font-size: 75%; line-height: 1.2; white-space: nowrap;
+}
+.mb-slash-fan {
+    position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;
+}
+.mb-slash-fan line { stroke: #bbb; stroke-width: 1; vector-effect: non-scaling-stroke; }
+
+.mb-chart { margin: 0.5em 0; }
+.mb-chart-bar { display: flex; align-items: flex-end; gap: 0.25em; height: 8em; }
+.mb-chart-bar .mb-bar {
+    flex: 1 1 0; height: calc(var(--mb-v) / var(--mb-max) * 100%);
+    background: var(--mbhighlightbgcolor, #ed6d);
+    border-radius: 0.15em 0.15em 0 0; text-align: center; font-size: 75%;
+}
+.mb-chart-pie { width: 8em; height: 8em; }
+
+/* 折叠块放在表格里时，被折叠的行 */
+tr[hidden] { display: none; }
+[data-mb-fold][hidden] { display: none; }
+/* ↑ 但表格里【不要】真的把行 display:none 掉：被隐藏的行不再占位，跨行的 rowspan 就会
+   把后面的行整片挤歪（表看起来散架）。表格里的折叠一律用 .mb-fold-off：
+   行留在表格里（rowspan 永远有效），只把那一行的内容与内边距收掉。 */
+/* 列表项 / 普通块：被折叠就直接藏起来 */
+[data-mb-fold].mb-fold-off:not(tr) { display: none; }
+tr.mb-fold-off > th, tr.mb-fold-off > td {
+    visibility: hidden; font-size: 0; line-height: 0;
+    padding: 0; border: 0; height: 0;
+}
+tr.mb-fold-off > th > *, tr.mb-fold-off > td > * { display: none; }
+
+/* ===== 媒体（图片 / 视频 / 音频） ===== */
+.mb-media, .mb-media-cover > img { max-width: 100%; }
+.mb-media-cover { display: inline-block; }
+.mb-media-cover > img { display: block; margin-bottom: 0.3em; }
+body.mb-doc video, body.mb-doc audio { max-width: 100%; }
+
+/* ===== 文档基础排版 ===== */
+body.mb-doc {
+    margin: 0 auto; padding: 2rem 1.25rem 4rem; max-width: 48rem;
+    background: #fff; color: #24292f;
+    font: 16px/1.8 -apple-system, "Segoe UI", "Noto Sans SC", Meiryo, sans-serif;
+    word-wrap: break-word;
+}
+body.mb-doc h1, body.mb-doc h2, body.mb-doc h3,
+body.mb-doc h4, body.mb-doc h5, body.mb-doc h6 { line-height: 1.35; margin: 1.6em 0 .6em; }
+body.mb-doc h1 { font-size: 1.9em; border-bottom: 1px solid #e5e5e5; padding-bottom: .25em; }
+body.mb-doc h2 { font-size: 1.5em; border-bottom: 1px solid #eee; padding-bottom: .2em; }
+body.mb-doc h3 { font-size: 1.25em; }
+body.mb-doc a { color: #0969da; }
+body.mb-doc blockquote { margin: 1em 0; padding: .1em 1em; color: #57606a;
+                         border-left: .25em solid #d0d7de; }
+body.mb-doc hr { height: 1px; border: 0; background: #d8dee4; margin: 2em 0; }
+body.mb-doc code { font-family: "SF Mono", Consolas, "Noto Sans Mono CJK SC", monospace;
+                   font-size: .9em; background: #f2f3f5; padding: .15em .35em; border-radius: .25em; }
+body.mb-doc pre { background: #f6f8fa; padding: .75em 1em; border-radius: .375em; overflow: auto; }
+body.mb-doc pre code { background: none; padding: 0; }
+body.mb-doc table { border-collapse: collapse; margin: 1em 0;
+                    /* 表格宽过屏幕时能左右滑动 */
+                    display: block; overflow-x: auto; max-width: 100%; }
+body.mb-doc th, body.mb-doc td { border: 1px solid #d0d7de; padding: .35em .6em; vertical-align: top; }
+body.mb-doc thead th, body.mb-doc th[scope=row] { background: #f2f3f5; }
+body.mb-doc img { max-width: 100%; }
+body.mb-doc dl { margin: 1em 0; }
+body.mb-doc dt { font-weight: 600; }
+body.mb-doc dd { margin: 0 0 .4em 1.5em; }
+body.mb-doc .mb-footnotes { margin-top: 3em; padding-top: .75em; border-top: 1px solid #e5e5e5;
+                            font-size: .9em; color: #57606a; }
+body.mb-doc .mb-exec:empty { display: none; }
+body.mb-doc .mb-exec:empty + br { display: none; }
+</style>
+</head>
+<body class="mb-doc">
+<h1>MarkBottom 0.1 版本标准</h1>
+<blockquote>
+<p>MarkBottom（以下简称“mb”） 是 MarkDown（以下简称“md”） 的扩充版本，文件后缀是<code>.mbmd</code>（MarkBottom of MarkDown），旨在补充原版 MarkDown 中缺少的功能，此文档不是正式的标准，后续可能会存在一些删改。</p>
+</blockquote>
+
+<p>mb 将支持所有 md 语法（包括标题、粗体、斜体、引用块、有序列表、无序列表、代码、分隔线、链接、图片(索引+bese64)、表格、代码块、脚注、定义列表、删除线、checkbox、下划线、双空格换行）</p>
+
+<hr>
+<h2>0. 阅读约定</h2>
+<ol>
+<li>本文档中<strong>所有的 <code>markbottom</code> 代码块都是“输入”，紧跟在它后面的 <code>html</code> 代码块是它“应当生成的 HTML”</strong>。表格里的 <code>mbmd</code> / <code>html</code> 两列含义相同。</li>
+<li>除少数必须依赖脚本的交互功能（按钮、输入框、选择框、功能语句等）外，其余语法都<strong>只依赖 HTML + CSS</strong> 即可正确渲染。</li>
+<li>交互功能的 mb 源码被<strong>原样</strong>写进 <code>data-mb</code> 属性，由运行时读取执行（参考实现见<a href="#附录-a参考实现-mbjs">附录 A</a>）。这只是<strong>一种</strong>实现约定，不属于标准的一部分。</li>
+<li>只要不产生歧义，定界符都允许使用对应的全角写法：<code>|</code>↔<code>｜</code>、<code>/</code>↔<code>／</code>`↔<code>＼</code>。ruby 的 <code>【】</code> 可写作半角 <code>[()]</code>。</li>
+<li>所有成对定界符都支持嵌套，按“<strong>就近配对</strong>”匹配，内层先解析。</li>
+<li>表格单元格里的 <code>|</code> <strong>不需要</strong>转义成 <code>\|</code>：解析表格时先切出行内代码段（被反引号包围的部分）和排版调整语句（<code>{|…|}</code>），再按 <code>|</code> 切分单元格。</li>
+</ol>
+
+<hr>
+<h2>1. 必要的样式定义</h2>
+<p>以下类名是标准的一部分：<strong>实现必须提供同名类，并保证语义一致</strong>；具体写法只是其中一种实现方法。</p>
+
+<pre><code class="language-css">.mb-ruby-under {
+    ruby-position: under;
+}
+.mb-ruby-over {
+    ruby-position: over;
+}
+.mb-bigger {
+    font-size: 150%;
+}
+.mb-smaller {
+    font-size: 75%;
+}
+.mb-gray {
+    opacity: 0.75;
+}
+.mb-commental {
+    opacity: 0.75;
+    font-size: 75%;
+}
+.mb-commental::before {
+    opacity: 0.75;
+    font-size: 75%;
+    content: &quot;(&quot;;
+}
+.mb-commental::after {
+    opacity: 0.75;
+    font-size: 75%;
+    content: &quot;)&quot;;
+}
+.mb-blacked {
+    color: #444;
+    background-color: #444;
+}
+.mb-blacked:hover {
+    color: #eee;
+}
+.mb-fgcolored {
+    color: var(--mbhighlightcolor, #26d);
+}
+.mb-bgcolored {
+    background-color: var(--mbhighlightbgcolor, #ed6d);
+}
+.mb-bgpartialcolored {
+    background-image: linear-gradient(var(--mbhighlightbgcolor, #ed6d), var(--mbhighlightbgcolor, #ed6d));
+    background-repeat: no-repeat;
+    background-size: 100% 0.5em;
+    background-position: 0 calc(100% - 0em);
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+}</code></pre>
+<p><span class="mb-commental">这些示例只是其中一种实现方法</span></p>
+
+<h3>1.1 0.1 版新增语法所需的样式（必需）</h3>
+<p>下面这些类名只要缺一个，对应的语法就<strong>显示不正确</strong>，所以实现必须提供。
+（只影响观感、不影响正确性的那几个放在 <a href="#12-可选的观感样式不影响正确性">1.2</a>。）</p>
+
+<pre><code class="language-css">/* —— 排版调整语句 —— */
+.mb-left   { text-align: left; }
+.mb-center { text-align: center; }
+.mb-right  { text-align: right; }
+.mb-block  { display: block; }
+.mb-float-right    { float: right;  clear: right; margin: 0 0 0.5em 0.5em; }
+.mb-float-left     { float: left;   clear: left;  margin: 0 0 0.5em 0.5em 0; }
+.mb-inline-middle  { display: inline-block; vertical-align: middle; }
+
+/* —— 竖排文本 —— */
+.mb-vertical   { writing-mode: vertical-rl; display: inline-block; vertical-align: top; }
+.mb-horizontal { writing-mode: horizontal-tb; }
+
+/* —— 原始文本 —— */
+.mb-origin { white-space: pre-wrap; }
+
+/* —— 按钮 / 输入框 / 选择框 —— */
+.mb-btn {
+    display: inline-block;
+    padding: 0.1em 0.8em;
+    border: 1px solid #aaa;
+    border-radius: 0.35em;
+    background: #f4f4f4;
+    color: inherit;
+    font: inherit;
+    line-height: 1.6;
+    text-decoration: none;
+    cursor: pointer;
+}
+/* —— 折叠块：基础形式 —— */
+.mb-fold &gt; summary { cursor: pointer; }
+
+/* —— 折叠块：末尾收起文本形式 —— */
+.mb-fold-inline { display: inline; }
+.mb-fold-inline &gt; .mb-fold-state {
+    position: absolute;
+    width: 0;
+    height: 0;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+.mb-fold-inline &gt; .mb-fold-body,
+.mb-fold-inline &gt; .mb-fold-close { display: none; }
+.mb-fold-inline &gt; .mb-fold-state:checked ~ .mb-fold-body,
+.mb-fold-inline &gt; .mb-fold-state:checked ~ .mb-fold-close { display: inline; }
+.mb-fold-inline &gt; .mb-fold-state:checked ~ .mb-fold-title { display: none; }
+.mb-fold-title, .mb-fold-close { cursor: pointer; font: inherit; }
+.mb-fold-title::before { content: &quot;▶ &quot;; }
+
+.mb-fold-block &gt; .mb-fold-state {
+    position: absolute;
+    width: 0;
+    height: 0;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+.mb-fold-block &gt; .mb-fold-body,
+.mb-fold-block &gt; .mb-fold-close { display: none; }
+.mb-fold-block &gt; .mb-fold-state:checked ~ .mb-fold-body { display: block; }
+.mb-fold-block &gt; .mb-fold-state:checked ~ .mb-fold-close { display: block; }
+.mb-fold-block &gt; .mb-fold-state:checked ~ .mb-fold-title { display: none; }
+
+/* 分离式折叠块：被折叠的内容 */
+[data-mb-fold][hidden] { display: none; }
+/* 但【表格行】不要用 display:none —— 被藏起来的行不再占位，跨行的 rowspan 会失准，
+   把后面的行整片挤歪（整张表看起来散架）。表格里改用下面这套：
+   行仍然留在表格里（rowspan 永远有效），只把那一行的内容与内边距收掉。 */
+/* 列表项 / 普通块：被折叠就直接藏起来 */
+[data-mb-fold].mb-fold-off:not(tr) { display: none; }
+tr.mb-fold-off &gt; th,
+tr.mb-fold-off &gt; td {
+    visibility: hidden;
+    font-size: 0;
+    line-height: 0;
+    padding: 0;
+    border: 0;
+    height: 0;
+}
+tr.mb-fold-off &gt; th &gt; *,
+tr.mb-fold-off &gt; td &gt; * { display: none; }
+
+/* —— 表格斜线 —— */
+.mb-slash { position: relative; }
+.mb-slash::before {
+    content: &quot;&quot;;
+    position: absolute;
+    inset: 0;
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    pointer-events: none;
+}
+/* “/”型：左下 → 右上 */
+.mb-slash-u::before {
+    background-image: url('data:image/svg+xml,&lt;svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 100 100&quot; preserveAspectRatio=&quot;none&quot;&gt;&lt;line x1=&quot;0&quot; y1=&quot;100&quot; x2=&quot;100&quot; y2=&quot;0&quot; stroke=&quot;%23bbb&quot; stroke-width=&quot;1&quot; vector-effect=&quot;non-scaling-stroke&quot;/&gt;&lt;/svg&gt;');
+}
+/* “\”型：左上 → 右下 */
+.mb-slash-d::before {
+    background-image: url('data:image/svg+xml,&lt;svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 100 100&quot; preserveAspectRatio=&quot;none&quot;&gt;&lt;line x1=&quot;0&quot; y1=&quot;0&quot; x2=&quot;100&quot; y2=&quot;100&quot; stroke=&quot;%23bbb&quot; stroke-width=&quot;1&quot; vector-effect=&quot;non-scaling-stroke&quot;/&gt;&lt;/svg&gt;');
+}
+.mb-slash &gt; .mb-slash-head,
+.mb-slash &gt; .mb-slash-mid,
+.mb-slash &gt; .mb-slash-tail { position: absolute; font-size: 75%; line-height: 1.2; }
+/* 三段以上时，中间各块的位置随线的走向而定；这里是“汇聚角 → 对边中点”这种约定下的落点 */
+.mb-slash &gt; .mb-slash-mid { top: 33%; left: 50%; transform: translate(-50%, -50%); }
+/* 三段以上的附加线：第一条线（串角对角线）由 .mb-slash-u / .mb-slash-d 的 ::before 负责，其余用这个 SVG */
+.mb-slash-fan {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+.mb-slash-fan line {
+    stroke: #bbb;
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
+.mb-slash-u &gt; .mb-slash-head { top: 0.1em; left: 0.3em; }      /* 左上：第一个 */
+.mb-slash-u &gt; .mb-slash-tail { bottom: 0.1em; right: 0.3em; }  /* 右下：最后一个 */
+.mb-slash-d &gt; .mb-slash-head { bottom: 0.1em; left: 0.3em; }   /* 左下：第一个 */
+.mb-slash-d &gt; .mb-slash-tail { top: 0.1em; right: 0.3em; }     /* 右上：最后一个 */
+
+/* —— 图表生成语句 —— */
+.mb-chart { margin: 0.5em 0; }
+.mb-chart-bar {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.25em;
+    height: 8em;
+}
+.mb-chart-bar .mb-bar {
+    flex: 1 1 0;
+    height: calc(var(--mb-v) / var(--mb-max) * 100%);
+    background: var(--mbhighlightbgcolor, #ed6d);
+    border-radius: 0.15em 0.15em 0 0;
+    text-align: center;
+    font-size: 75%;
+}
+.mb-chart-pie { width: 8em; height: 8em; }
+
+/* —— 图片 / 视频 / 音频（见 3.21） —— */
+.mb-media, .mb-media-cover &gt; img { max-width: 100%; }
+.mb-media-cover { display: inline-block; }
+.mb-media-cover &gt; img { display: block; margin-bottom: 0.3em; }</code></pre>
+<h3>1.2 可选的观感样式（不影响正确性）</h3>
+<p>下面这些类名只是让控件更好看；什么都不写也能正确工作。（另外：<strong>表格宽度超出屏幕时应当能左右滑动</strong>，例如给表格加 <code>display: block; overflow-x: auto; max-width: 100%</code>。）</p>
+
+<pre><code class="language-css">.mb-btn:hover  { background: #e9e9e9; }
+.mb-btn:active { background: #dedede; }
+
+.mb-input {
+    font: inherit;
+    padding: 0.1em 0.4em;
+    border: 1px solid #aaa;
+    border-radius: 0.25em;
+    background: #fff;
+    color: inherit;
+}
+
+.mb-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    cursor: pointer;
+}</code></pre>
+<hr>
+<h2>2. 以下是 mb 中新增的语法</h2>
+<table>
+<thead><tr><th class="mb-slash mb-slash-d" scope="col"><svg class="mb-slash-fan" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line x1="100" y1="100" x2="42.26" y2="0.00"></line></svg><span class="mb-slash-head" style="left:33.3%;top:80.8%;transform:translate(-50%,-50%)">语法</span><span class="mb-slash-mid" style="left:47.4%;top:47.4%;transform:translate(-50%,-50%)">示例</span><span class="mb-slash-tail" style="left:80.8%;top:33.3%;transform:translate(-50%,-50%)">格式</span></th><th>mbmd</th><th>html</th></tr></thead>
+<tbody>
+<tr><th rowspan="15" scope="row">ruby text</th><td><code>【振仮名|ふりがな】</code></td><td rowspan="4"><code>&lt;ruby&gt;振仮名&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;ふりがな&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;&lt;/ruby&gt;</code></td></tr>
+<tr><td><input type="checkbox" class="mb-fold-state" id="mbd-f1" data-mb-rows="mbd-f1"><label class="mb-fold-title" for="mbd-f1">其他写法</label></td></tr>
+<tr data-mb-fold="mbd-f1" class="mb-fold-off"><td><code>【振仮名｜ふりがな】</code></td></tr>
+<tr data-mb-fold="mbd-f1" class="mb-fold-off"><td><code>[(振仮名|ふりがな)]</code></td></tr>
+<tr><td><code>【振仮名/ふりがな】</code></td><td rowspan="4"><code>&lt;ruby class=&quot;mb-ruby-under&quot;&gt;振仮名&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;ふりがな&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;&lt;/ruby&gt;</code></td></tr>
+<tr><td><input type="checkbox" class="mb-fold-state" id="mbd-f2" data-mb-rows="mbd-f2"><label class="mb-fold-title" for="mbd-f2">其他写法</label></td></tr>
+<tr data-mb-fold="mbd-f2" class="mb-fold-off"><td><code>【振仮名／ふりがな】</code></td></tr>
+<tr data-mb-fold="mbd-f2" class="mb-fold-off"><td><code>[(振仮名/ふりがな)]</code></td></tr>
+<tr><td><code>【紅玉|モミだま/ルビ】</code></td><td rowspan="7"><code>&lt;ruby&gt;&lt;ruby&gt;紅玉&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;モミだま&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;&lt;/ruby&gt;&lt;rp&gt;(&lt;/rp&gt;&lt;rt class=&quot;mb-ruby-under&quot;&gt;ルビ&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;&lt;/ruby&gt;</code></td></tr>
+<tr><td><input type="checkbox" class="mb-fold-state" id="mbd-f3" data-mb-rows="mbd-f3"><label class="mb-fold-title" for="mbd-f3">其他写法</label></td></tr>
+<tr data-mb-fold="mbd-f3" class="mb-fold-off"><td><code>【紅玉｜モミだま／ルビ】</code></td></tr>
+<tr data-mb-fold="mbd-f3" class="mb-fold-off"><td><code>【紅玉|モミだま／ルビ】</code></td></tr>
+<tr data-mb-fold="mbd-f3" class="mb-fold-off"><td><code>【紅玉｜モミだま/ルビ】</code></td></tr>
+<tr data-mb-fold="mbd-f3" class="mb-fold-off"><td><code>【紅玉|モミだま/ルビ】</code></td></tr>
+<tr data-mb-fold="mbd-f3" class="mb-fold-off"><td><code>[(紅玉|モミだま/ルビ)]</code></td></tr>
+<tr><th rowspan="3" scope="row">变大</th><td><code>&lt;-[Bigger Text]-&gt;</code></td><td rowspan="3"><code>&lt;span class=&quot;mb-bigger&quot;&gt;Bigger Text&lt;/span&gt;</code></td></tr>
+<tr><td><input type="checkbox" class="mb-fold-state" id="mbd-f4" data-mb-rows="mbd-f4"><label class="mb-fold-title" for="mbd-f4">其他写法</label></td></tr>
+<tr data-mb-fold="mbd-f4" class="mb-fold-off"><td><code>+[Bigger Text]+</code></td></tr>
+<tr><th rowspan="3" scope="row">变小</th><td><code>-&gt;[Smaller Text]&lt;-</code></td><td rowspan="3"><code>&lt;span class=&quot;mb-smaller&quot;&gt;Smaller Text&lt;/span&gt;</code></td></tr>
+<tr><td><input type="checkbox" class="mb-fold-state" id="mbd-f5" data-mb-rows="mbd-f5"><label class="mb-fold-title" for="mbd-f5">其他写法</label></td></tr>
+<tr data-mb-fold="mbd-f5" class="mb-fold-off"><td><code>-[Smaller Text]-</code></td></tr>
+<tr><th scope="row">上标</th><td><code>^[superscript]^</code></td><td><code>&lt;sup&gt;superscript&lt;/sup&gt;</code></td></tr>
+<tr><th scope="row">下标</th><td><code>_[subscript]_</code></td><td><code>&lt;sub&gt;subscript&lt;/sub&gt;</code></td></tr>
+<tr><th scope="row">灰色</th><td><code>@(Gray Text)@</code></td><td><code>&lt;span class=&quot;mb-gray&quot;&gt;Gray Text&lt;/span&gt;</code></td></tr>
+<tr><th scope="row">注解</th><td><code>_(Commental)_</code></td><td><code>&lt;span class=&quot;mb-commental&quot;&gt;Commental&lt;/span&gt;</code></td></tr>
+<tr><th scope="row">涂黑的隐藏文本</th><td><code>#(too much things you know)#</code></td><td><code>&lt;span class=&quot;mb-blacked&quot;&gt;too much things you know&lt;/span&gt;</code></td></tr>
+<tr><th scope="row">上色</th><td><code>!'Colored Text'!</code></td><td><code>&lt;span class=&quot;mb-fgcolored&quot;&gt;Colored Text&lt;/span&gt;</code></td></tr>
+<tr><th scope="row">背景上色</th><td><code>!,Colored Text,!</code></td><td><code>&lt;span class=&quot;mb-bgcolored&quot;&gt;Colored Text&lt;/span&gt;</code></td></tr>
+<tr><th scope="row">部分背景上色</th><td><code>!.Colored Text.!</code></td><td><code>&lt;span class=&quot;mb-bgpartialcolored&quot;&gt;Colored Text&lt;/span&gt;</code></td></tr>
+<tr><th scope="row">前景、背景上色</th><td><code>!;Colored Text;!</code></td><td><code>&lt;span class=&quot;mb-fgcolored mb-bgcolored&quot;&gt;Colored Text&lt;/span&gt;</code></td></tr>
+<tr><th scope="row">前景、部分背景上色</th><td><code>!:Colored Text:!</code></td><td><code>&lt;span class=&quot;mb-fgcolored mb-bgpartialcolored&quot;&gt;Colored Text&lt;/span&gt;</code></td></tr>
+<tr><th scope="row">折叠块</th><td><code>~[展开][一堆文本][收起]</code></td><td><code>&lt;span class=&quot;mb-fold-inline&quot;&gt;&lt;input type=&quot;checkbox&quot; id=&quot;mb-fold-7&quot; class=&quot;mb-fold-state&quot;&gt;&lt;label for=&quot;mb-fold-7&quot; class=&quot;mb-fold-title&quot;&gt;展开&lt;/label&gt;&lt;span class=&quot;mb-fold-body&quot;&gt;一堆文本&lt;/span&gt;&lt;label for=&quot;mb-fold-7&quot; class=&quot;mb-fold-close&quot;&gt;收起&lt;/label&gt;&lt;/span&gt;</code></td></tr>
+<tr><th scope="row">分离式折叠块</th><td><code>~[标题]~&gt;[标识符]</code> 与 <code>[标识符]~&gt;[内容]</code></td><td><code>&lt;input type=&quot;checkbox&quot; class=&quot;mb-fold-state&quot; id=&quot;mbd-id&quot; data-mb-rows=&quot;mbd-id&quot;&gt;&lt;label class=&quot;mb-fold-title&quot; for=&quot;mbd-id&quot;&gt;标题&lt;/label&gt;</code></td></tr>
+<tr><th scope="row">按钮式连接</th><td><code>[[示例链接](example.com)]</code></td><td><code>&lt;a class=&quot;mb-btn&quot; href=&quot;example.com&quot;&gt;示例链接&lt;/a&gt;</code></td></tr>
+<tr><th scope="row">功能语句</th><td><code>{{put:&quot;hello world&quot;}}</code></td><td><code>&lt;span class=&quot;mb-exec&quot; data-mb=&quot;{{put:&amp;quot;hello world&amp;quot;}}&quot;&gt;&lt;/span&gt;</code></td></tr>
+<tr><th scope="row">按钮</th><td><code>[[点击计算&quot;1+1&quot;]{{put:1+1}}]</code></td><td><code>&lt;button type=&quot;button&quot; class=&quot;mb-btn&quot; data-mb=&quot;{{put:1+1}}&quot;&gt;点击计算&quot;1+1&quot;&lt;/button&gt;</code></td></tr>
+<tr><th scope="row">输入框</th><td><code>:[placeholder](default content)-&gt;(#btnid){{put:&quot;primer&quot;+:$cntnt$}}</code></td><td><code>&lt;input type=&quot;text&quot; class=&quot;mb-input&quot; placeholder=&quot;placeholder&quot; value=&quot;default content&quot; data-mb-enter=&quot;#btnid&quot; data-mb=&quot;{{put:&amp;quot;primer&amp;quot;+:$cntnt$}}&quot;&gt;</code></td></tr>
+<tr><th scope="row">多行输入框</th><td><code>[:[placeholder](default content){{put:&quot;primer&quot;+:$cntnt$}}]</code></td><td><code>&lt;textarea class=&quot;mb-input&quot; placeholder=&quot;placeholder&quot; data-mb=&quot;{{put:&amp;quot;primer&amp;quot;+:$cntnt$}}&quot;&gt;default content&lt;/textarea&gt;</code></td></tr>
+<tr><th scope="row">选择框</th><td><code>[;[placeholder][option1][option2][option3](default){{put:&quot;you selected&quot;+:$cntnt$}}]</code></td><td><code>&lt;select class=&quot;mb-input&quot; data-mb=&quot;{{put:&amp;quot;you selected&amp;quot;+:$cntnt$}}&quot;&gt;&lt;option value=&quot;&quot; disabled hidden&gt;placeholder&lt;/option&gt;&lt;option&gt;option1&lt;/option&gt;&lt;option&gt;option2&lt;/option&gt;&lt;option&gt;option3&lt;/option&gt;&lt;/select&gt;</code></td></tr>
+<tr><th scope="row">标签</th><td><code>::Label:</code></td><td><code>&lt;label class=&quot;mb-label&quot;&gt;Label&lt;/label&gt;</code></td></tr>
+<tr><th scope="row">转义符</th><td><code>\n\&lt;\&gt;</code></td><td><code>&lt;br&gt;&amp;lt;&amp;gt;</code></td></tr>
+<tr><th scope="row">原始文本</th><td><code>[o[origin         al]o]</code></td><td><code>&lt;span class=&quot;mb-origin&quot;&gt;origin         al&lt;/span&gt;</code></td></tr>
+<tr><th scope="row">原始转义符</th><td><code>\o!\o[这不是一个链接](example.com)</code></td><td><code>![这不是一个链接](example.com)</code></td></tr>
+<tr><th scope="row">略过解析次数</th><td><code>{/`=3}`test` ` `text</code></td><td><code>&lt;code&gt;test` ` `text&lt;/code&gt;</code></td></tr>
+<tr><th rowspan="2" scope="row">竖排文本</th><td><code>「「竖排文本」」</code></td><td rowspan="2"><code>&lt;span class=&quot;mb-vertical&quot;&gt;竖排文本&lt;/span&gt;</code></td></tr>
+<tr><td><code>[|[竖排文本]|]</code></td></tr>
+<tr><th rowspan="2" scope="row">竖排中的横排文本</th><td><code>「「横排文本『『in』』竖排文本」」</code></td><td rowspan="2"><code>&lt;span class=&quot;mb-vertical&quot;&gt;横排文本&lt;span class=&quot;mb-horizontal&quot;&gt;in&lt;/span&gt;竖排文本&lt;/span&gt;</code></td></tr>
+<tr><td><code>[|[横排文本[-[in]-]竖排文本]|]</code></td></tr>
+<tr><th scope="row">图片 / 视频 / 音频</th><td><code>![替代文本](地址)((描述))</code></td><td><code>&lt;img src=&quot;地址&quot; alt=&quot;替代文本&quot; aria-label=&quot;描述&quot;&gt;</code>（视频 / 音频换成 <code>&lt;video&gt;</code> / <code>&lt;audio&gt;</code>）</td></tr>
+</tbody></table>
+
+<p><em>此外 mb 还对表格功能进行了扩展</em></p>
+
+<hr>
+<h2>3. 详细介绍</h2>
+<h3>3.1 命名语句与整体结构</h3>
+<p>一个 mb 文档的开头通常写成：</p>
+
+<pre><code class="language-markbottom">{{v:0.1}{l:&quot;zh_CN&quot;}}</code></pre>
+<p>它声明了文档使用的 mb 版本与语言。这类语句<strong>不产生可见输出</strong>，实现可以把它记录进文档元数据。</p>
+
+<pre><code class="language-html">&lt;!-- v=0.1, l=zh_CN：仅元数据，无可见输出 --&gt;</code></pre>
+<p><strong>命名语句</strong> <code>{#id.class1.class2}</code> 写在<strong>要取名的元素后面</strong>，给紧挨着它前面的那个元素（或它所在的那一行 / 那一块）取名字、加类：</p>
+
+<pre><code class="language-markbottom"># 标题1 {#t1}
+这一整段文字 {#note1.warn}</code></pre>
+<pre><code class="language-html">&lt;h1 id=&quot;t1&quot;&gt;标题1&lt;/h1&gt;
+&lt;p id=&quot;note1&quot; class=&quot;warn&quot;&gt;这一整段文字&lt;/p&gt;</code></pre>
+<ul>
+<li><code>#</code> 后面是 <code>id</code>，只能有一个；</li>
+<li><code>.</code> 后面是 <code>class</code>，可以写多个；</li>
+<li>命名语句本身不产生输出，只修改目标元素的属性。</li>
+</ul>
+
+<p><strong>目标是谁</strong>：</p>
+
+<table>
+<thead><tr><th>写法</th><th>目标</th><th>结果</th></tr></thead>
+<tbody>
+<tr><td><code># 标题1 {#t1}</code></td><td>它所在的那个块（标题）</td><td><code>&lt;h1 id=&quot;t1&quot;&gt;标题1&lt;/h1&gt;</code></td></tr>
+<tr><td><code>这一整段文字 {#p1}</code></td><td>它所在的那个块（段落）</td><td><code>&lt;p id=&quot;p1&quot;&gt;这一整段文字&lt;/p&gt;</code></td></tr>
+<tr><td><code>**注意**{#w1}</code></td><td>紧挨在它前面的那个行内元素</td><td><code>&lt;strong id=&quot;w1&quot;&gt;注意&lt;/strong&gt;</code></td></tr>
+<tr><td><code>**注意**{.warn}</code></td><td>只设类名</td><td><code>&lt;strong class=&quot;warn&quot;&gt;注意&lt;/strong&gt;</code></td></tr>
+<tr><td><code>![猫](cat.png){#cat}</code></td><td>紧挨在它前面的那个行内元素</td><td><code>&lt;img id=&quot;cat&quot; src=&quot;cat.png&quot; alt=&quot;猫&quot;&gt;</code></td></tr>
+<tr><td><code># 标题1 {#t1.a.b}</code></td><td>一次写多个类名</td><td><code>&lt;h1 id=&quot;t1&quot; class=&quot;a b&quot;&gt;标题1&lt;/h1&gt;</code></td></tr>
+<tr><td><code>|单元格{#c1}|</code></td><td>它所在的那个单元格</td><td><code>&lt;td id=&quot;c1&quot;&gt;单元格&lt;/td&gt;</code></td></tr>
+</tbody></table>
+
+<ul>
+<li>前面是<strong>普通文字</strong>（文字本身不是元素）时，给<strong>它所在的那个块</strong>取名；前面是一个<strong>完整的元素</strong>时，给<strong>那个元素</strong>取名。</li>
+<li>与排版调整语句的行尾写法一致（见 <a href="#394-排版调整语句">3.9.4</a>）：<code>{|…|}</code> 放在块 / 单元格末尾时，加的也是所在块 / 单元格的类。</li>
+</ul>
+
+<p><strong>规则</strong></p>
+
+<ol>
+<li>命名语句写在元素的<strong>后面</strong>（<code>元素 {#id}</code>），写法与 <code>{|…|}</code> 的行尾用法一致。</li>
+<li><code>#</code> 后是 <code>id</code>（只能有一个），<code>.</code> 后是 <code>class</code>（可以写多个）：可以<strong>只设类名</strong>（<code>{.classname}</code>），也可以一次写<strong>多个类名</strong>（<code>{#id.c1.c2.c3}</code> → <code>id=&quot;id&quot; class=&quot;c1 c2 c3&quot;</code>）。</li>
+<li>单独成行时，作用到<strong>它上面</strong>的那个块；上面还没有块时，作用到<strong>下面的</strong>那个块。</li>
+</ol>
+
+<hr>
+<h3>3.2 ruby text</h3>
+<p>用于显示汉语拼音、注音符号或振假名的文本形式，通常标注在汉字的上方</p>
+
+<p>在 mb 中，参考了游戏引擎<code>ren'py</code>中的写法：</p>
+
+<pre><code class="language-markbottom">【基字|上标ruby】
+这里的“|”（半角）写作“｜”（全角）也是可以的</code></pre>
+<p>但不同于 ren'py 的是，mb 中的 ruby 文本还支持下标：</p>
+
+<pre><code class="language-markbottom">【基字/下标ruby】
+【基字|上标ruby/下标ruby】
+这里的“|”“/”（半角）写作“｜““／”（全角）也是可以的</code></pre>
+<p>为了方便输入也可以使用<code>[()]</code>（只能是半角）来替代<code>【】</code>
+同时mb应该要自动添加<code>&lt;rp&gt;</code>标签来保证不支持ruby的设备显示出来不影响阅读</p>
+
+<p>当没有输入 ruby text 时
+默认将给予每个字符标上“●”，可作为着重符合：</p>
+
+<pre><code class="language-markbottom">在日本，横排时着重点【一般标在上方|】。而中国则【一般标在下方/】</code></pre>
+<p>并且ruby可以嵌套：</p>
+
+<pre><code class="language-markbottom">【【基字/下标ruby】|【上标ruby|上标ruby】】</code></pre>
+<h4>三种基本形式</h4>
+<table>
+<thead><tr><th>写法</th><th>含义</th><th>ruby 位置</th></tr></thead>
+<tbody>
+<tr><td><code>【基字|上标】</code></td><td>只有上标</td><td><code>over</code>（默认）</td></tr>
+<tr><td><code>【基字/下标】</code></td><td>只有下标</td><td><code>under</code></td></tr>
+<tr><td><code>【基字|上标/下标】</code></td><td>上下都有</td><td>外层 <code>under</code></td></tr>
+</tbody></table>
+
+<p>上标：</p>
+
+<pre><code class="language-markbottom">【振仮名|ふりがな】</code></pre>
+<pre><code class="language-html">&lt;ruby&gt;振仮名&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;ふりがな&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;&lt;/ruby&gt;</code></pre>
+<p>下标（给 <code>&lt;ruby&gt;</code> 加 <code>mb-ruby-under</code>）：</p>
+
+<pre><code class="language-markbottom">【振仮名/ふりがな】</code></pre>
+<pre><code class="language-html">&lt;ruby class=&quot;mb-ruby-under&quot;&gt;振仮名&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;ふりがな&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;&lt;/ruby&gt;</code></pre>
+<p>上下同时标注时<strong>必须使用嵌套的 <code>&lt;ruby&gt;</code></strong>——按 HTML 规范，多个 <code>&lt;rt&gt;</code> 会并排而不是叠放，只有把内层 ruby 当作外层 ruby 的 base text 才能上下各放一条注释：</p>
+
+<pre><code class="language-markbottom">【紅玉|モミだま/ルビ】</code></pre>
+<pre><code class="language-html">&lt;ruby class=&quot;mb-ruby-under&quot;&gt;&lt;ruby class=&quot;mb-ruby-over&quot;&gt;紅玉&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;モミだま&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;&lt;/ruby&gt;&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;ルビ&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;&lt;/ruby&gt;</code></pre>
+<blockquote>
+<p><strong>注意</strong>：<code>ruby-position</code> 是<strong>继承属性</strong>，而且只作用于「ruby 注释容器」（<code>&lt;ruby&gt;</code> / <code>&lt;rtc&gt;</code>）——直接写在内层 <code>&lt;rt&gt;</code> 上是<strong>不生效</strong>的。正确做法是：把 <code>mb-ruby-under</code> 加在<strong>外层</strong> <code>&lt;ruby&gt;</code> 上，同时给<strong>内层</strong> <code>&lt;ruby&gt;</code> 显式加 <code>mb-ruby-over</code> 把它压回上方。这样才能做到「上标在上、下标在下」。</p>
+</blockquote>
+
+<h4>着重号</h4>
+<p>当 <code>|</code> 或 <code>/</code> 后面为空时，应当给<strong>每一个字符</strong>都标一个 <code>●</code>。注意两点：</p>
+
+<ol>
+<li>必须拆成多个“base+rt”组，否则多个 <code>&lt;rt&gt;</code> 会被并排放在整串文字的中间；</li>
+<li><code>|</code>（上标）用普通 <code>&lt;ruby&gt;</code>；<code>/</code>（下标）必须写成 <code>&lt;ruby class=&quot;mb-ruby-under&quot;&gt;</code>，否则点会跑到上方去。</li>
+</ol>
+
+<pre><code class="language-markbottom">在日本，横排时着重点【一般标在上方|】。而中国则【一般标在下方/】</code></pre>
+<pre><code class="language-html">在日本，横排时着重点&lt;ruby&gt;一&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;●&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;般&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;●&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;标&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;●&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;在&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;●&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;上&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;●&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;方&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;●&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;&lt;/ruby&gt;。而中国则&lt;ruby class=&quot;mb-ruby-under&quot;&gt;一&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;●&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;般&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;●&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;标&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;●&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;在&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;●&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;下&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;●&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;方&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;●&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;&lt;/ruby&gt;</code></pre>
+<blockquote>
+<p>另一种等价的实现是 CSS 的 <code>text-emphasis: filled dot</code> + <code>text-emphasis-position: over | under</code>，但它不受 <code>【】</code> 内的内容控制，因此只作为可选优化。</p>
+</blockquote>
+
+<h4>嵌套 ruby</h4>
+<pre><code class="language-markbottom">【【基字/下标ruby】|【上标ruby|上标ruby】】</code></pre>
+<pre><code class="language-html">&lt;ruby&gt;&lt;ruby class=&quot;mb-ruby-under&quot;&gt;基字&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;下标ruby&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;&lt;/ruby&gt;&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;&lt;ruby&gt;上标ruby&lt;rp&gt;(&lt;/rp&gt;&lt;rt&gt;上标ruby&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;&lt;/ruby&gt;&lt;/rt&gt;&lt;rp&gt;)&lt;/rp&gt;&lt;/ruby&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li><code>【】</code> 之间的第一段是基字，第一段之后被 <code>|</code> 分开的是上标，被 <code>/</code> 分开的是下标。</li>
+<li>基字中若还含有 <code>【】</code>，按“就近配对”先解析内层。</li>
+<li>基字为空时<strong>按原样输出</strong>（不报错、不丢弃）；上标/下标同时为空时等价于空 ruby，输出基字本身。</li>
+<li><code>|</code>、<code>/</code>、<code>｜</code>、<code>／</code> 同时出现时以最先出现的那个为分隔语义。</li>
+</ol>
+
+<hr>
+<h3>3.3 变大 / 变小</h3>
+<p>把一段文字放大到 150%、缩小到 75%。</p>
+
+<pre><code class="language-markbottom">&lt;-[Bigger Text]-&gt; 与 -&gt;[Smaller Text]&lt;-</code></pre>
+<pre><code class="language-html">&lt;span class=&quot;mb-bigger&quot;&gt;Bigger Text&lt;/span&gt; 与 &lt;span class=&quot;mb-smaller&quot;&gt;Smaller Text&lt;/span&gt;</code></pre>
+<p>其他写法：</p>
+
+<pre><code class="language-markbottom">+[Bigger Text]+ 与 -[Smaller Text]-</code></pre>
+<pre><code class="language-html">&lt;span class=&quot;mb-bigger&quot;&gt;Bigger Text&lt;/span&gt; 与 &lt;span class=&quot;mb-smaller&quot;&gt;Smaller Text&lt;/span&gt;</code></pre>
+<p><strong>规则</strong>：<code>&lt;-[...]-&gt;</code>／<code>+[...]+</code> 一律解析为变大；<code>-&gt;[...]&lt;-</code>／<code>-[...]-</code> 一律解析为变小。因为变小用的 <code>-[...]-</code> 与删除线 <code>~~</code> 不冲突，可以共存。内容中若要出现 <code>]-</code>、<code>]+</code> 等序列，需要用转义符。</p>
+
+<hr>
+<h3>3.4 上标 / 下标</h3>
+<pre><code class="language-markbottom">x^[2]^ + y_[1]_</code></pre>
+<pre><code class="language-html">x&lt;sup&gt;2&lt;/sup&gt; + y&lt;sub&gt;1&lt;/sub&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li>定界符必须成对出现；<code>^</code> 中的内容再出现 <code>^</code> 时按就近配对处理。</li>
+<li>上标/下标<strong>不能互相嵌套</strong>（<code>^[a_[b]_]^</code> 中的 <code>_[]_</code> 不生效，算作普通文字）。</li>
+<li>因为下划线已经被 <code>_[…]_</code>（下标）和 <code>_(…)_</code>（注解）占用，mb 把<strong>单个下划线包裹</strong>的 <code>_文字_</code> 定义为<strong>下划线</strong>——编译成 <code>&lt;u&gt;文字&lt;/u&gt;</code>；<strong>斜体一律用 <code>*文字*</code></strong>。这是 mb 与 md 的一处有意差异。</li>
+</ol>
+
+<hr>
+<h3>3.5 灰色 / 注解 / 涂黑的隐藏文本</h3>
+<pre><code class="language-markbottom">@(Gray Text)@
+_(Commental)_
+#(too much things you know)#</code></pre>
+<pre><code class="language-html">&lt;span class=&quot;mb-gray&quot;&gt;Gray Text&lt;/span&gt;
+&lt;span class=&quot;mb-commental&quot;&gt;Commental&lt;/span&gt;
+&lt;span class=&quot;mb-blacked&quot;&gt;too much things you know&lt;/span&gt;</code></pre>
+<ul>
+<li><strong>灰色</strong>：降低不透明度，用于弱化说明文字。</li>
+<li><strong>注解</strong>：渲染成小一号、淡色、并自动用 <code>::before</code>/<code>::after</code> 补上左右括号的夹注。</li>
+<li><strong>涂黑的隐藏文本</strong>：前景色与背景色相同，鼠标悬停（<code>:hover</code>）后才显示，用于“剧透/敏感内容”。</li>
+</ul>
+
+<p><strong>规则</strong>：三者都是一行内元素，可互相嵌套（如 <code>@(_(x)_)@</code>）；<code>@( )@</code> 内容里的 <code>)</code> 需要用 <code>\)</code> 转义。</p>
+
+<hr>
+<h3>3.6 上色文本</h3>
+<pre><code class="language-markbottom">!'Colored Text'!
+!,Colored Text,!
+!.Colored Text.!
+!;Colored Text;!
+!:Colored Text:!</code></pre>
+<pre><code class="language-html">&lt;span class=&quot;mb-fgcolored&quot;&gt;Colored Text&lt;/span&gt;
+&lt;span class=&quot;mb-bgcolored&quot;&gt;Colored Text&lt;/span&gt;
+&lt;span class=&quot;mb-bgpartialcolored&quot;&gt;Colored Text&lt;/span&gt;
+&lt;span class=&quot;mb-fgcolored mb-bgcolored&quot;&gt;Colored Text&lt;/span&gt;
+&lt;span class=&quot;mb-fgcolored mb-bgpartialcolored&quot;&gt;Colored Text&lt;/span&gt;</code></pre>
+<table>
+<thead><tr><th>定界符</th><th>前景</th><th>背景</th></tr></thead>
+<tbody>
+<tr><td><code>!'…'!</code></td><td>✔</td><td>✘</td></tr>
+<tr><td><code>!,…,!</code></td><td>✘</td><td>整块背景</td></tr>
+<tr><td><code>!.….!</code></td><td>✘</td><td>下半部分背景（荧光笔）</td></tr>
+<tr><td><code>!;…;!</code></td><td>✔</td><td>整块背景</td></tr>
+<tr><td><code>!:…:!</code></td><td>✔</td><td>下半部分背景</td></tr>
+</tbody></table>
+
+<p><strong>规则</strong></p>
+
+<ol>
+<li>默认颜色由 CSS 变量 <code>--mbhighlightcolor</code> / <code>--mbhighlightbgcolor</code> 提供，便于整站换色与“暗色模式”。</li>
+<li>想要指定具体颜色时，在定界符后紧跟 <code>#rgb</code>／<code>#rrggbb</code>／颜色名，例如 <code>!'#e33'红色'!</code>，实现应当把它写成 <code>style=&quot;--mbhighlightcolor:#e33&quot;</code>（或直接 <code>color</code>）。</li>
+<li>五种定界符可以嵌套，颜色以最内层为准。</li>
+</ol>
+
+<hr>
+<h3>3.7 折叠块</h3>
+<p>使用 <code>~[折叠块标题][内容]</code> 创建折叠块，默认将只展示标题，并在前面加上一个三角形，点击后展开文本。</p>
+
+<p>还可以使用 <code>~[折叠块标题]:[内容]</code> 创建默认展开的折叠块。</p>
+
+<p>使用 <code>~[折叠块标题][内容][收起文本]</code> 创建的折叠块在展开后，标题会消失，取而代之的是末尾的收起文本（省略后将默认显示为“▲”），同样支持通过在标题和内容间添加“:”默认展开</p>
+
+<blockquote>
+<p>三种形式开头的 <code>~</code> 是<strong>定界符的一部分，不能省略</strong>——<code>[标题][内容]</code> 不会被（也不该被）当成折叠块。</p>
+</blockquote>
+
+<h4>基础形式</h4>
+<pre><code class="language-markbottom">~[折叠块标题][这是一堆文本。]</code></pre>
+<pre><code class="language-html">&lt;details class=&quot;mb-fold&quot;&gt;
+  &lt;summary&gt;折叠块标题&lt;/summary&gt;
+  这是一堆文本。
+&lt;/details&gt;</code></pre>
+<p>默认展开：</p>
+
+<pre><code class="language-markbottom">~[折叠块标题]:[这是一堆文本。]</code></pre>
+<pre><code class="language-html">&lt;details class=&quot;mb-fold&quot; open&gt;
+  &lt;summary&gt;折叠块标题&lt;/summary&gt;
+  这是一堆文本。
+&lt;/details&gt;</code></pre>
+<h4>末尾收起文本形式</h4>
+<pre><code class="language-markbottom">~[展开][一堆文本][收起]</code></pre>
+<pre><code class="language-html">&lt;span class=&quot;mb-fold-inline&quot;&gt;
+  &lt;input type=&quot;checkbox&quot; id=&quot;mb-fold-7&quot; class=&quot;mb-fold-state&quot;&gt;
+  &lt;label for=&quot;mb-fold-7&quot; class=&quot;mb-fold-title&quot;&gt;展开&lt;/label&gt;
+  &lt;span class=&quot;mb-fold-body&quot;&gt;一堆文本&lt;/span&gt;
+  &lt;label for=&quot;mb-fold-7&quot; class=&quot;mb-fold-close&quot;&gt;收起&lt;/label&gt;
+&lt;/span&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li>三种形式由“第三段是否存在”区分：只有两段时用 <code>&lt;details&gt;</code>；有三段时用“checkbox + label”的纯 CSS 折叠（这样展开时标题才能消失、末尾才出现收起文本）。</li>
+<li>三段式中第三段为空（<code>~[标题][内容][]</code>）时，收起文本默认显示为 <code>▲</code>。</li>
+<li>三段式默认展开时写成 <code>~[标题]:[内容][收起]</code>，对应 <code>&lt;input … checked&gt;</code>。</li>
+<li><code>id</code> 必须全局唯一，实现需要自行生成（如上例的 <code>mb-fold-7</code>）；同一页有多个折叠块时必须各不相同。</li>
+<li>收起文本<strong>原样显示</strong>，前后不加任何装饰符；标准只要求给“标题”前面加一个三角形。</li>
+<li><strong>一般折叠块是块级的</strong>：可以放在段落之间，也可以放在<strong>表格单元格里</strong>（放在单元格里时它就是个普通的块级折叠块，只折自己那一格里的内容）；但<strong>不要放在列表项中间</strong>——它会打断列表。要折叠<strong>表格行、列表项</strong>，请用下面的<strong>分离式折叠块</strong>。</li>
+</ol>
+
+<h4>分离式折叠块</h4>
+<p>一般折叠块把“按钮”和“内容”写在了一起；<strong>分离式折叠块</strong>把它们拆成两处，专门用来折叠<strong>列表项</strong>和<strong>表格行</strong>：</p>
+
+<ul>
+<li><code>~[标题]~&gt;[标识符]</code>：生成折叠<strong>按钮</strong>（行内元素），放在你想让按钮出现的地方——段落里、表格单元格里、列表项里都行；</li>
+<li><code>[标识符]~&gt;[内容]</code>：表示被折叠的<strong>内容</strong>。<code>~&gt;</code> 后面的 <code>[</code> … <code>]</code> 就是内容的边界，<strong>可以跨多行</strong>。</li>
+</ul>
+
+<p>开头的 <code>~</code> 和两处方括号<strong>都是必需的，一个都不能省</strong>。</p>
+
+<p>折叠表格行：</p>
+
+<pre><code class="language-markbottom">|项目 ||写法 |示例 |
+|---|---|---|
+|[+]|| ~[其他写法]~&gt;[f1] |[+]|
+[f1]~&gt;[
+|[+]||其它写法 |示例 |
+]
+|项目 ||写法 |示例 |</code></pre>
+<pre><code class="language-html">&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+  &lt;th rowspan=&quot;3&quot; scope=&quot;row&quot;&gt;项目&lt;/th&gt;
+  &lt;th&gt;写法&lt;/th&gt;
+  &lt;th rowspan=&quot;2&quot;&gt;示例&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+  &lt;td&gt;
+    &lt;input type=&quot;checkbox&quot; class=&quot;mb-fold-state&quot; id=&quot;mbd-f1&quot; data-mb-rows=&quot;mbd-f1&quot;&gt;
+    &lt;label class=&quot;mb-fold-title&quot; for=&quot;mbd-f1&quot;&gt;其他写法&lt;/label&gt;
+  &lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr data-mb-fold=&quot;mbd-f1&quot; class=&quot;mb-fold-off&quot;&gt;&lt;td&gt;其它写法&lt;/td&gt;&lt;td&gt;示例&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;th scope=&quot;row&quot;&gt;项目&lt;/th&gt;&lt;td&gt;写法&lt;/td&gt;&lt;td&gt;示例&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;&lt;/table&gt;</code></pre>
+<blockquote>
+<p>注意最后两行：收尾的 <code>]</code> <strong>不会结束表格</strong>——它后面的 <code>| … |</code> 仍算<strong>同一张表</strong>，继续往下接。折叠语句只负责把内容藏起来，<strong>不会把表格打断</strong>。（实现注意：表格里被折叠的行<strong>不要</strong>用 <code>display:none</code>——被藏的行不再占位，跨行的 <code>rowspan</code> 会失准、把后面的行整片挤歪。参考做法：行仍然留在表格里，只把那一行的内容与内边距收掉（见第 1.1 节的 <code>.mb-fold-off</code>），这样 <code>rowspan</code> 永远是对的、展开收起都不需要重算。）</p>
+</blockquote>
+
+<p>折叠列表项：</p>
+
+<pre><code class="language-markbottom">- 列表第一项 ~[展开]~&gt;[list1]
+[list1]~&gt;[
+- 被折叠的第二项
+- 被折叠的第三项
+]</code></pre>
+<pre><code class="language-html">&lt;ul&gt;
+  &lt;li&gt;列表第一项
+    &lt;input type=&quot;checkbox&quot; class=&quot;mb-fold-state&quot; id=&quot;mbd-list1&quot; data-mb-rows=&quot;mbd-list1&quot;&gt;
+    &lt;label class=&quot;mb-fold-title&quot; for=&quot;mbd-list1&quot;&gt;展开&lt;/label&gt;
+  &lt;/li&gt;
+  &lt;li data-mb-fold=&quot;mbd-list1&quot; hidden&gt;被折叠的第二项&lt;/li&gt;
+  &lt;li data-mb-fold=&quot;mbd-list1&quot; hidden&gt;被折叠的第三项&lt;/li&gt;
+&lt;/ul&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li>两处用<strong>同一个标识符</strong>联系。标识符只要是文件内唯一的字母 / 数字 / 下划线组合即可；实现会把它映射成合法的 HTML <code>id</code>（如上例的 <code>mbd-f1</code>），所以按钮和内容可以<strong>相隔很远</strong>。</li>
+<li>内容的 <code>[</code> … <code>]</code> <strong>按方括号配对</strong>找收尾（内容里可以出现 <code>[…]</code>）；收尾的 <code>]</code> 单独占一行最好读。</li>
+<li>内容里的<strong>每一行都原样</strong>参与解析——以 <code>|</code> 开头就是表格行，以 <code>-</code> / <code>1.</code> 开头就是列表项，其余按普通文本处理。（<code>[标识符]~&gt;[</code> 后面剩下的文字、以及收尾 <code>]</code> 前面剩下的文字都<strong>不算一整行</strong>；内容里真正的<strong>空行</strong>会结束“并入表格 / 列表”这件事。）</li>
+<li><strong>周围有表格时会合在一起</strong>：这些行只要紧挨着表格（前一行是表格行），就<strong>并入那张表格</strong>，继续参与 <code>[+]</code> / <code>[+&gt;]</code> 的合并；折叠时整行隐藏，<strong>不会打断表格</strong>。</li>
+<li>同理，以 <code>-</code> / <code>1.</code> 开头的行会<strong>并入相邻的列表</strong>，折叠时隐藏对应的 <code>&lt;li&gt;</code>，<strong>不会打断列表</strong>。</li>
+<li>不在表格 / 列表里时，整段内容作为一个块被隐藏或显示。</li>
+<li>折叠按钮本身只是行内的 <code>&lt;input type=&quot;checkbox&quot;&gt;</code> + <code>&lt;label&gt;</code>，所以能放在任何行内位置。</li>
+<li>内容行里<strong>不能</strong>再嵌一个分离式折叠块。</li>
+</ol>
+
+<hr>
+<h3>3.8 按钮式连接</h3>
+<p>让一个链接看起来像按钮：</p>
+
+<pre><code class="language-markbottom">[[示例链接](example.com)]</code></pre>
+<pre><code class="language-html">&lt;a class=&quot;mb-btn&quot; href=&quot;example.com&quot;&gt;示例链接&lt;/a&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li><code>[[ … ]]</code> 里第一个完整的一对方括号是“显示文本”，紧跟在后面的 <code>( … )</code> 是链接地址。</li>
+<li>显示文本为空时，用地址本身作为显示文本。</li>
+<li>与“按钮”的区别：按钮式连接是<strong>静态链接</strong>（<code>&lt;a href&gt;</code>），按钮是<strong>交互控件</strong>（<code>&lt;button&gt;</code> + <code>data-mb</code>）。当 <code>[[ ]]</code> 里出现了执行语句时，一律按“按钮”处理。</li>
+</ol>
+
+<hr>
+<h3>3.9 功能语句</h3>
+<p>这是 mb 中最复杂的语法，分为：</p>
+
+<ul>
+<li><code>{#id.class}</code> 这样的命名语句</li>
+<li><code>{: :}</code> 包裹的内容语句</li>
+<li><code>{{ }}</code> 包裹的执行语句</li>
+<li><code>{| |}</code> 包裹的排版调整语句</li>
+<li><code>{/ }</code> 包裹的解析语句</li>
+<li><code>{[ ]}</code> 包裹的图表生成语句</li>
+<li><code>{</code> + 反引号 …… 反引号 + <code>}</code> 包裹的计算语句</li>
+<li><code>{$usrname$}</code> 这样的变量语句</li>
+</ul>
+
+<h4>3.9.1 命名语句</h4>
+<p>见 <a href="#31-命名语句与整体结构">3.1</a>。</p>
+
+<h4>3.9.2 内容语句</h4>
+<p>内容语句用来生成一些难以输入的字符，格式为<code>{:分类:名称或参数:}</code>。</p>
+
+<p>标准的分类包括：</p>
+
+<ul>
+<li>greek</li>
+<li>unicode</li>
+<li>control</li>
+<li>emoji</li>
+<li>icon</li>
+</ul>
+
+<pre><code class="language-markbottom">{:greek:alpha:} {:greek:Alpha:} {:greek:pi:}
+{:unicode:1F600:} {:unicode:00E9:}
+{:control:nbsp:} {:control:copy:} {:control:hellip:}
+{:emoji:smile:} {:emoji:heart:}
+{:icon:warning:} {:icon:check:}</code></pre>
+<pre><code class="language-html">α Α π
+😀 é
+&amp;nbsp; &amp;copy; &amp;hellip;
+😄 ❤️
+⚠️ ✅</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li>语法是 <code>{:</code> + <code>分类</code> + <code>:</code> + <code>名称或参数</code> + <code>:}</code>；三个冒号都不可省略。</li>
+<li><code>greek</code> 的名称首字母大写表示大写希腊字母（<code>alpha</code>→<code>α</code>，<code>Alpha</code>→<code>Α</code>）。</li>
+<li><code>unicode</code> 的参数是十六进制码位，大小写均可，不带 <code>U+</code>。</li>
+<li><code>control</code> 的名称是 HTML 实体名（不含 <code>&amp;</code> 和 <code>;</code>），输出实体本身。</li>
+<li><code>emoji</code> / <code>icon</code> 可以加肤色、样式等后缀参数：<code>{:emoji:thumbsup:dark:}</code>；它们直接输出字符本身，不额外包标签（想读屏友好的实现可以自行加 <code>role=&quot;img&quot;</code> 与 <code>aria-label</code>，但那不属于标准）。</li>
+<li>未知名称应当<strong>原样输出</strong>该语句，而不是丢弃。</li>
+</ol>
+
+<h4>3.9.3 执行语句</h4>
+<p>执行语句用来执行一些操作，格式为<code>{{函数名:参数}{函数名:参数}{函数名}...}</code>，当它们被单独放置在一行的时候就会自动执行。当加在按钮/输入框等元素（我称之为“触发器”）内时则是条件触发</p>
+
+<p>标准的函数包括：</p>
+
+<ul>
+<li><code>v</code>，用于声明 mb 版本</li>
+<li><code>l</code>，用于声明文档语言</li>
+<li><code>put</code>，用于在该语句之后插入文本</li>
+<li><code>rplcStart</code>，无参数，用于标记<code>rplc</code>函数的替换开始位置</li>
+<li><code>rplcEnd</code>，无参数，用于标记<code>rplc</code>函数的替换结束位置</li>
+<li><code>rplc</code>，向上匹配最近的 rplcStart 标记，向下匹配最近的 rplcEnd 标记，并删除它们之间的内容（包括标记本身），替换为新的内容</li>
+<li><code>t</code>，设置页面标题，如 <code>{{t:&quot;标题&quot;}}</code></li>
+<li><code>trigger</code>，<code>trigger:&quot;flag&quot;</code>：把<strong>同一组里它后面的那些功能语句</strong>记在 <code>flag</code> 名下，<strong>先不执行</strong></li>
+<li><code>call</code>，<code>call:&quot;flag&quot;</code>：在<strong>原来 trigger 的位置</strong>执行 <code>flag</code> 名下那串语句（如 <code>put</code> 的结果就出现在原处）</li>
+<li><code>use</code>，<code>use:&quot;flag&quot;</code>：在 <strong>use 语句所在的位置</strong>执行 <code>flag</code> 名下那串语句</li>
+</ul>
+
+<p>单独成行时：</p>
+
+<pre><code class="language-markbottom">{{put:&quot;hello world&quot;}}</code></pre>
+<pre><code class="language-html">&lt;span class=&quot;mb-exec&quot; data-mb=&quot;{{put:&amp;quot;hello world&amp;quot;}}&quot;&gt;&lt;/span&gt;</code></pre>
+<p>运行时执行后，文档中这一处会出现 <code>hello world</code>。</p>
+
+<p>作为触发器的一部分时：</p>
+
+<pre><code class="language-markbottom">[[点我]{{put:&quot;111&quot;}}]</code></pre>
+<pre><code class="language-html">&lt;button type=&quot;button&quot; class=&quot;mb-btn&quot; data-mb=&quot;{{put:&amp;quot;111&amp;quot;}}&quot;&gt;点我&lt;/button&gt;</code></pre>
+<p>计算与替换：</p>
+
+<pre><code class="language-markbottom">1+1={`1+1`}
+{{rplcStart}}这里的内容会被整段删掉{{rplcEnd}}{{rplc:&quot;新的内容&quot;}}</code></pre>
+<pre><code class="language-html">1+1=&lt;span class=&quot;mb-exec&quot; data-mb=&quot;{{put:1+1}}&quot;&gt;&lt;/span&gt;
+&lt;span class=&quot;mb-exec&quot; data-mb=&quot;{{rplcStart}}&quot;&gt;&lt;/span&gt;这里的内容会被整段删掉&lt;span class=&quot;mb-exec&quot; data-mb=&quot;{{rplcEnd}}&quot;&gt;&lt;/span&gt;&lt;span class=&quot;mb-exec&quot; data-mb=&quot;{{rplc:&amp;quot;新的内容&amp;quot;}}&quot;&gt;&lt;/span&gt;</code></pre>
+<p>执行之后，页面上分别显示 <code>1+1=2</code> 和 <code>新的内容</code>（被标记包住的那一段连同两个标记一起消失）。</p>
+
+<p><strong>规则</strong></p>
+
+<ol>
+<li>外层 <code>{ }</code> 里可以放一个或多个 <code>{函数名:参数}</code> 单元，<strong>从左到右依次执行</strong>。</li>
+<li>参数缺省时（<code>{函数名}</code>）等价于空参数。</li>
+<li>参数中的字符串用 <code>&quot;</code> 包裹，内部 <code>&quot;</code> 写作 <code>\&quot;</code>；参数本身可以是完整的计算语句表达式。</li>
+<li>单独成行 → 编译为 <code>&lt;span class=&quot;mb-exec&quot; data-mb=&quot;{{…}}&quot;&gt;&lt;/span&gt;</code>，页面加载后立刻执行一次。</li>
+<li>出现在触发器内部 → 编译成触发器的 <code>data-mb</code> 属性，只在触发时执行。</li>
+<li><code>put</code> 把结果作为<strong>文本节点</strong>插到该语句之后，重复触发时重复插入；<strong>插入的文本会被当成 mb 文本再解析一遍</strong>，并且会与紧邻的已有文本合成新的 mb 文本（例：页面上已有 <code>a*</code>，<code>put</code> 在它前面输出 <code>*a</code>，就合成斜体 <code>*aa*</code>）（这也是它的正常语义）。</li>
+<li><code>rplc</code> 只作用于同一文档中最靠近的一对标记；标记未成对出现时 <code>rplc</code> 不执行任何操作，并在控制台给出警告。<code>rplc</code> 语句写在两个标记<strong>之间</strong>也可以——被删掉的是一对标记连同它们之间的全部内容（<code>rplc</code> 语句自己也一起消失），替换出来的文本同样按 mb 文本再解析。</li>
+<li><code>{{a}}{{b}}</code> 与 <code>{{a}{b}}</code> 等价，实现两者都要能正确拆分（转换器会把前者规范成后者）。属性值中的 <code>&quot;</code> 必须写成 <code>&amp;quot;</code>，<code>&amp;</code> 写成 <code>&amp;amp;</code>，<code>&lt;</code> 写成 <code>&amp;lt;</code>。</li>
+</ol>
+
+<h4>3.9.4 排版调整语句</h4>
+<p>主要有<code>{|:---:|}</code> <code>{|:---|}</code> <code>{|---:|}</code>，分别对应居中、左对齐、右对齐。被放置在单独的行时会改变该语句下方的文本对齐模式，也可以放在一行后面或者某个表格的一个单元格的结尾对它们进行单独调整对齐。</p>
+
+<p>它还有改变元素嵌入位置的功能：<code>{|===|}</code>可以让元素单独占一行，<code>{|--.5|}</code>可以让元素贴在下一段文本右侧并占据5行高度，<code>{|-.1-|}</code>可以让元素插入所在文本的中间并占据1行高度，<code>{|.6--|}</code>可以让元素贴在下一段文本左侧并占据6行高度。该语句主要用于对插图的位置进行调整，但也可作用于其他元素。该排版调整功能可以和上一个合用如<code>{|===:|}</code>能让文本右对齐并单独占一行</p>
+
+<p><strong>① 对齐</strong></p>
+
+<table>
+<thead><tr><th>写法</th><th>含义</th><th>加上去的类</th></tr></thead>
+<tbody>
+<tr><td><code>{|:---:|}</code></td><td>居中</td><td><code>mb-center</code></td></tr>
+<tr><td><code>{|:---|}</code></td><td>左对齐</td><td><code>mb-left</code></td></tr>
+<tr><td><code>{|---:|}</code></td><td>右对齐</td><td><code>mb-right</code></td></tr>
+</tbody></table>
+
+<p>单独成行时，它把<strong>下方</strong>的块级内容包进一个带类的容器：</p>
+
+<pre><code class="language-markbottom">{|:---:|}
+这是居中的段落。</code></pre>
+<pre><code class="language-html">&lt;div class=&quot;mb-center&quot;&gt;
+&lt;p&gt;这是居中的段落。&lt;/p&gt;
+&lt;/div&gt;</code></pre>
+<p>放在行尾时，它修改<strong>本行所属的块</strong>：</p>
+
+<pre><code class="language-markbottom">这一行右对齐{|---:|}</code></pre>
+<pre><code class="language-html">&lt;p class=&quot;mb-right&quot;&gt;这一行右对齐&lt;/p&gt;</code></pre>
+<p>放在表格单元格末尾时，它修改<strong>该单元格</strong>：</p>
+
+<pre><code class="language-markbottom">| 内容{|:---:|} | 普通内容 |</code></pre>
+<pre><code class="language-html">&lt;table&gt;&lt;tbody&gt;&lt;tr&gt;&lt;td class=&quot;mb-right&quot;&gt;内容&lt;/td&gt;&lt;td&gt;普通内容&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;</code></pre>
+<p><strong>② 元素嵌入位置</strong></p>
+
+<table>
+<thead><tr><th>写法</th><th>含义</th><th>加上去的类</th></tr></thead>
+<tbody>
+<tr><td><code>{|===|}</code></td><td>元素单独占一行（md 里图片的默认策略就是这个）</td><td><code>mb-block</code></td></tr>
+<tr><td><code>{|--.5|}</code></td><td>元素贴在下一段文本<strong>右</strong>侧，占 5 行高</td><td><code>mb-float-right</code></td></tr>
+<tr><td><code>{|.6--|}</code></td><td>元素贴在下一段文本<strong>左</strong>侧，占 6 行高</td><td><code>mb-float-left</code></td></tr>
+<tr><td><code>{|-.1-|}</code></td><td>元素插入文本<strong>中间</strong>，占 1 行高</td><td><code>mb-inline-middle</code></td></tr>
+</tbody></table>
+
+<p>格式可以记成 <code>{| &lt;左侧标记&gt; . &lt;行数&gt; &lt;右侧标记&gt; |}</code>：<code>.</code> 前面有 <code>-</code> 表示左侧有文字环绕，<code>.</code> 后面有 <code>-</code> 表示右侧有文字环绕，两侧都有则元素插在中间；<code>===</code> 表示独占一行。</p>
+
+<pre><code class="language-markbottom">{|--.5|}
+![一只猫](cat.png)</code></pre>
+<pre><code class="language-html">&lt;div class=&quot;mb-float-right&quot; style=&quot;height: 5em&quot;&gt;&lt;img src=&quot;cat.png&quot; alt=&quot;一只猫&quot;&gt;&lt;/div&gt;</code></pre>
+<p><strong>③ 合用</strong></p>
+
+<p>对齐标记 <code>:</code> 与位置标记可以写在一起，位置在前、对齐在后（用 <code>:</code> 结尾表示右对齐、开头表示左对齐、两端都有表示居中）：</p>
+
+<pre><code class="language-markbottom">{|===:|}
+![一只猫](cat.png)</code></pre>
+<pre><code class="language-html">&lt;div class=&quot;mb-block mb-right&quot;&gt;&lt;img src=&quot;cat.png&quot; alt=&quot;一只猫&quot;&gt;&lt;/div&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li>排版调整语句本身<strong>不产生可见输出</strong>，它只是给目标元素追加类名。</li>
+<li><code>===</code> 与 <code>-…-</code> 互斥；同时出现时以 <code>===</code> 为准。</li>
+<li>“行数”是浮点数，编译成 <code>style=&quot;height: &lt;n&gt;em&quot;</code>（约等于行高的倍数）。</li>
+<li><code>===</code> 表示元素独占一行——这本来就是 md 里图片的默认显示策略，所以对图片来说 <code>{|===|}</code> 相当于显式声明，主要用途是把<strong>行内</strong>的元素恢复成块级。</li>
+</ol>
+
+<h4>3.9.5 解析语句</h4>
+<p>加在代码块或原始文本块前面，略过一些结束标识的解析。</p>
+
+<pre><code class="language-markbottom">{/`=3}`test` ` `text</code></pre>
+<pre><code class="language-html">&lt;code&gt;test` ` `text&lt;/code&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li>形式为 <code>{/`=n}</code>，<code>n</code> 是非负整数，表示<strong>接下来的那个块在遇到结束标识时，前 n 次不结束</strong>。</li>
+<li>因此可以写出“内容里包含结束标识”的代码/原始文本块，而不必转义。</li>
+<li>它本身不产生任何输出，只影响解析；如果 <code>n</code> 比块里实际出现的结束标识还多，则块一直延伸到行尾/块尾。</li>
+</ol>
+
+<blockquote>
+<p>与计算语句（3.9.7）<strong>不冲突</strong>：计算语句用「<code>{</code> + 反引号」开始、「反引号 + <code>}</code>」结束，而本节的解析语句用 <code>{/</code> 开始、<code>}</code> 结束。</p>
+</blockquote>
+
+<h4>3.9.6 图表生成语句</h4>
+<p>形式为 <code>{[类型:数据:参数]}</code>，直接生成图表或表格。</p>
+
+<table>
+<thead><tr><th>类型</th><th>含义</th></tr></thead>
+<tbody>
+<tr><td><code>表</code></td><td>表格</td></tr>
+<tr><td><code>柱</code></td><td>柱状图</td></tr>
+<tr><td><code>折</code></td><td>折线图</td></tr>
+<tr><td><code>饼</code></td><td>饼图（环形）</td></tr>
+</tbody></table>
+
+<p>数据用逗号分隔；表格用 <code>;</code> 分行、<code>,</code> 分列。</p>
+
+<pre><code class="language-markbottom">{[柱:3,5,2,8]}</code></pre>
+<pre><code class="language-html">&lt;figure class=&quot;mb-chart mb-chart-bar&quot; style=&quot;--mb-max:8&quot; role=&quot;img&quot; aria-label=&quot;柱状图&quot;&gt;
+  &lt;div class=&quot;mb-bar&quot; style=&quot;--mb-v:3&quot;&gt;&lt;span&gt;3&lt;/span&gt;&lt;/div&gt;
+  &lt;div class=&quot;mb-bar&quot; style=&quot;--mb-v:5&quot;&gt;&lt;span&gt;5&lt;/span&gt;&lt;/div&gt;
+  &lt;div class=&quot;mb-bar&quot; style=&quot;--mb-v:2&quot;&gt;&lt;span&gt;2&lt;/span&gt;&lt;/div&gt;
+  &lt;div class=&quot;mb-bar&quot; style=&quot;--mb-v:8&quot;&gt;&lt;span&gt;8&lt;/span&gt;&lt;/div&gt;
+&lt;/figure&gt;</code></pre>
+<pre><code class="language-markbottom">{[折:1,4,2,8]}</code></pre>
+<pre><code class="language-html">&lt;svg class=&quot;mb-chart&quot; viewBox=&quot;0 0 100 40&quot; preserveAspectRatio=&quot;none&quot; role=&quot;img&quot; aria-label=&quot;折线图&quot;&gt;
+  &lt;polyline fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1&quot; vector-effect=&quot;non-scaling-stroke&quot;
+            points=&quot;0,40 33.3,20 66.7,30 100,0&quot;&gt;&lt;/polyline&gt;
+&lt;/svg&gt;</code></pre>
+<pre><code class="language-markbottom">{[饼:30,20,50]}</code></pre>
+<pre><code class="language-html">&lt;svg class=&quot;mb-chart mb-chart-pie&quot; viewBox=&quot;0 0 42 42&quot; role=&quot;img&quot; aria-label=&quot;饼图&quot;&gt;
+  &lt;circle cx=&quot;21&quot; cy=&quot;21&quot; r=&quot;15.9155&quot; fill=&quot;none&quot; stroke=&quot;#4e79a7&quot; stroke-width=&quot;10&quot;
+          stroke-dasharray=&quot;30 70&quot; stroke-dashoffset=&quot;25&quot;&gt;&lt;/circle&gt;
+  &lt;circle cx=&quot;21&quot; cy=&quot;21&quot; r=&quot;15.9155&quot; fill=&quot;none&quot; stroke=&quot;#f28e2b&quot; stroke-width=&quot;10&quot;
+          stroke-dasharray=&quot;20 80&quot; stroke-dashoffset=&quot;-5&quot;&gt;&lt;/circle&gt;
+  &lt;circle cx=&quot;21&quot; cy=&quot;21&quot; r=&quot;15.9155&quot; fill=&quot;none&quot; stroke=&quot;#e15759&quot; stroke-width=&quot;10&quot;
+          stroke-dasharray=&quot;50 50&quot; stroke-dashoffset=&quot;-25&quot;&gt;&lt;/circle&gt;
+&lt;/svg&gt;</code></pre>
+<pre><code class="language-markbottom">{[表:姓名,年龄;小明,12;小红,11]}</code></pre>
+<pre><code class="language-html">&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;姓名&lt;/th&gt;&lt;th&gt;年龄&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;&lt;tr&gt;&lt;td&gt;小明&lt;/td&gt;&lt;td&gt;12&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;小红&lt;/td&gt;&lt;td&gt;11&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li><code>参数</code> 可省略；可选参数用 <code>;</code> 追加，如 <code>{[饼:30,20,50;标题=占比]}</code>。</li>
+<li>数据也允许写成变量/表达式：<code>{[柱:$a,$b,$c]}</code>。</li>
+<li>图表必须带上 <code>role=&quot;img&quot;</code> 与一段文字 <code>aria-label</code>，保证无障碍。</li>
+<li>折线图/饼图用 <code>&lt;svg&gt;</code>，柱状图允许用纯 CSS 实现。</li>
+</ol>
+
+<h4>3.9.7 计算语句</h4>
+<p>用于计算表达式并直接显示结果，但如果在触发器后面则不会显示结果，这些运算方法也可以传入执行语句的参数中</p>
+
+<p><strong>定界符</strong>：开始符是「<code>{</code> 紧接一个反引号」，结束符是「一个反引号紧接 <code>}</code>」，也就是 <code>{</code> + 反引号 + 表达式 + 反引号 + <code>}</code>。因此它和以 <code>{/</code> 开头、以 <code>}</code> 结尾的解析语句（3.9.5）<strong>完全不会冲突</strong>。</p>
+
+<pre><code class="language-markbottom">1 + 1 = {`1+1`}</code></pre>
+<pre><code class="language-html">1 + 1 = 2</code></pre>
+<p>作为触发器的一部分时不显示结果，只把值交给函数：</p>
+
+<pre><code class="language-markbottom">[[算一下]{{put:1+1}}]</code></pre>
+<pre><code class="language-html">&lt;button type=&quot;button&quot; class=&quot;mb-btn&quot; data-mb=&quot;{{put:1+1}}&quot;&gt;算一下&lt;/button&gt;</code></pre>
+<p>计算语句写在执行语句的参数里时，编译出去参数时应把它的定界符去掉（参数本身已经是一个表达式）：</p>
+
+<pre><code class="language-markbottom">[[算一下]{{put:2*3+4}}]</code></pre>
+<pre><code class="language-html">&lt;button type=&quot;button&quot; class=&quot;mb-btn&quot; data-mb=&quot;{{put:2*3+4}}&quot;&gt;算一下&lt;/button&gt;</code></pre>
+<p>运算符:</p>
+
+<ul>
+<li><code>+</code>，加</li>
+<li><code>-</code>，减</li>
+<li><code>*</code>，乘</li>
+<li><code>/</code>，除以</li>
+<li><code>[n]</code>，第个字符</li>
+<li><code>+:</code>，拼接</li>
+<li><code>-:</code>，剔除</li>
+<li><code>%: &gt;:</code>，替换全部 ... 为 ...</li>
+<li><code>!</code>，非</li>
+<li><code>|</code>，或</li>
+<li><code>&amp;</code>，且</li>
+<li><code>==</code>，等于</li>
+<li><code>&gt;</code>，大于</li>
+<li><code>&lt;</code>，小于</li>
+<li><code>&gt;=</code>，大于或等于</li>
+<li><code>&lt;=</code>，小于或等于</li>
+<li><code>!=</code>，不等于</li>
+<li><code>=</code>，赋值</li>
+<li><code>++</code>，自增</li>
+<li><code>--</code>，自减</li>
+<li><code>+=</code>，增加</li>
+<li><code>-=</code>，减少</li>
+<li><code>*=</code>，翻倍</li>
+<li><code>/=</code>，除以并赋值</li>
+<li><code>%</code>，求余</li>
+<li><code>.-</code>，向下取整</li>
+<li><code>.+</code>，向上取整</li>
+<li><code>.?</code>，四舍五入</li>
+<li><code>? :</code> 若 则 否则</li>
+</ul>
+
+<table>
+<thead><tr><th>运算符</th><th>含义</th><th>例子</th><th>结果</th></tr></thead>
+<tbody>
+<tr><td><code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>%</code></td><td>四则运算与求余</td><td><code>{`7%3`}</code></td><td><code>1</code></td></tr>
+<tr><td><code>[n]</code></td><td>第 n 个字符（从 1 开始）</td><td><code>{`&quot;abc&quot;[2]`}</code></td><td><code>b</code></td></tr>
+<tr><td><code>+:</code></td><td>拼接</td><td><code>{`&quot;a&quot;+:&quot;b&quot;`}</code></td><td><code>ab</code></td></tr>
+<tr><td><code>-:</code></td><td>剔除（删掉所有出现）</td><td><code>{`&quot;abcb&quot;-:&quot;b&quot;`}</code></td><td><code>ac</code></td></tr>
+<tr><td><code>%: … &gt;:</code></td><td>替换全部…为…</td><td><code>{`&quot;a-b-c&quot;%:&quot;-&quot;&gt;:&quot;+&quot;`}</code></td><td><code>a+b+c</code></td></tr>
+<tr><td><code>!</code></td><td>非</td><td><code>{`!0`}</code></td><td><code>true</code></td></tr>
+<tr><td><code>|</code></td><td>或</td><td><code>{`0|1`}</code></td><td><code>true</code></td></tr>
+<tr><td><code>&amp;</code></td><td>且</td><td><code>{`1&amp;1`}</code></td><td><code>true</code></td></tr>
+<tr><td><code>==</code> <code>!=</code></td><td>等于 / 不等于</td><td><code>{`1==2`}</code></td><td><code>false</code></td></tr>
+<tr><td><code>&gt;</code> <code>&lt;</code> <code>&gt;=</code> <code>&lt;=</code></td><td>比较</td><td><code>{`2&gt;=2`}</code></td><td><code>true</code></td></tr>
+<tr><td><code>=</code> <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code></td><td>赋值</td><td><code>{`$a=1}{`$a+=2`}</code></td><td><code>$a</code> 为 <code>3</code></td></tr>
+<tr><td><code>++</code> <code>--</code></td><td>自增 / 自减</td><td><code>{`$a++`}</code></td><td>返回自增前的值</td></tr>
+<tr><td><code>.-</code> <code>.+</code> <code>.?</code></td><td>向下 / 向上取整、四舍五入</td><td><code>{`1.5.?`}</code></td><td><code>2</code></td></tr>
+<tr><td><code>? :</code></td><td>若则否则</td><td><code>{`1?&quot;y&quot;:&quot;n&quot;`}</code></td><td><code>y</code></td></tr>
+</tbody></table>
+
+<p><strong>规则</strong></p>
+
+<ol>
+<li>优先级（由低到高）：<code>? :</code> → <code>=</code> 等赋值 → <code>|</code> → <code>&amp;</code> → <code>==</code> <code>!=</code> → <code>&gt;</code> <code>&lt;</code> <code>&gt;=</code> <code>&lt;=</code> → <code>+:</code> <code>-:</code> <code>%:…&gt;:</code> → <code>+</code> <code>-</code> → <code>*</code> <code>/</code> <code>%</code> → 一元 <code>!</code> <code>-</code> → 后缀 <code>[n]</code> <code>.-</code> <code>.+</code> <code>.?</code> → 括号 / 字面量 / 变量。</li>
+<li><code>+</code> 做<strong>数值</strong>相加，<code>-</code> 做<strong>数值</strong>相减；字符串拼接必须用 <code>+:</code>，剔除必须用 <code>-:</code>。</li>
+<li>真假值：<code>&quot;&quot;</code>、<code>0</code>、<code>&quot;0&quot;</code>、<code>null</code>、<code>undefined</code>、<code>false</code> 为假，其余为真。</li>
+<li><code>[n]</code> 的下标从 <strong>1</strong> 开始；越界返回空串。</li>
+<li>除数为 0 时结果为 <code>Infinity</code>，<code>0/0</code> 为 <code>NaN</code>，实现应当原样显示 <code>Infinity</code> / <code>NaN</code> 而不是报错。</li>
+<li>计算语句的输出是<strong>文本节点</strong>，必须做 HTML 转义。</li>
+</ol>
+
+<h4>3.9.8 变量</h4>
+<p>由<code>$ $</code>包裹，既可以使用变量语句直接显示值，可以放置在其他功能语句中。区分大小写。</p>
+
+<p>mb有一些特殊变量：</p>
+
+<ul>
+<li><code>$cntnt$</code>，内容，触发器传入的内容</li>
+<li><code>$timeh$</code></li>
+<li><code>$timem$</code></li>
+<li><code>$times$</code></li>
+<li><code>$timeY$</code></li>
+<li><code>$timeM$</code></li>
+<li><code>$timeD$</code></li>
+<li><code>$browser$</code></li>
+<li><code>$os$</code></li>
+</ul>
+
+<pre><code class="language-markbottom">现在是 {$timeY$}-{$timeM$}-{$timeD$} {$timeh$}:{$timem$}:{$times$}
+你的浏览器是 {$browser$}</code></pre>
+<pre><code class="language-html">现在是 &lt;span class=&quot;mb-exec&quot; data-mb=&quot;{{put:$timeY$}}&quot;&gt;&lt;/span&gt;-&lt;span class=&quot;mb-exec&quot; data-mb=&quot;{{put:$timeM$}}&quot;&gt;&lt;/span&gt;-&lt;span class=&quot;mb-exec&quot; data-mb=&quot;{{put:$timeD$}}&quot;&gt;&lt;/span&gt; …</code></pre>
+<table>
+<thead><tr><th>变量</th><th>含义</th><th>格式</th></tr></thead>
+<tbody>
+<tr><td><code>$cntnt$</code></td><td>触发器传入的内容</td><td>—</td></tr>
+<tr><td><code>$timeh$</code> / <code>$timem$</code> / <code>$times$</code></td><td>时 / 分 / 秒</td><td>两位，前导补 0</td></tr>
+<tr><td><code>$timeY$</code></td><td>年</td><td>四位</td></tr>
+<tr><td><code>$timeM$</code> / <code>$timeD$</code></td><td>月 / 日</td><td>两位，前导补 0</td></tr>
+<tr><td><code>$browser$</code></td><td>浏览器标识（UA 串）</td><td>—</td></tr>
+<tr><td><code>$os$</code></td><td>操作系统标识</td><td>—</td></tr>
+</tbody></table>
+
+<p><strong>规则</strong></p>
+
+<ol>
+<li>变量名区分大小写：<code>$timeh$</code>（小写 h）是小时，<code>$timeY$</code>（大写 Y）是年份。</li>
+<li>未定义的变量返回<strong>空串</strong>，不报错。</li>
+<li>变量与 <code>put:</code> 等连用时，如果同一文档里出现过多次，取<strong>最近一次被赋值</strong>的值；全局变量在整个文档中共享。</li>
+<li><code>$cntnt$</code> 只在触发器内部有值：
+<ul>
+<li>按钮 → 按钮的文字内容；</li>
+<li>输入框 / 多行输入框 / 选择框 → 控件的当前值。</li>
+</ul>
+</li>
+<li><code>$ $</code> 内部不允许出现空格；需要显示一个真正的 <code>$</code> 时用 <code>\$</code>。</li>
+<li>时间类变量（<code>$timeh$</code> … <code>$timeD$</code>）<strong>在每次被调用时自动刷新</strong>，取的是调用那一刻的值，而不是页面加载时的值。</li>
+</ol>
+
+<hr>
+<h3>3.10 按钮</h3>
+<pre><code class="language-markbottom">[[点击计算&quot;1+1&quot;]{{put:1+1}}]</code></pre>
+<pre><code class="language-html">&lt;button type=&quot;button&quot; class=&quot;mb-btn&quot; data-mb=&quot;{{put:1+1}}&quot;&gt;点击计算&quot;1+1&quot;&lt;/button&gt;</code></pre>
+<p>最简按钮：</p>
+
+<pre><code class="language-markbottom">[[点我]{{put:&quot;hello&quot;}}]</code></pre>
+<pre><code class="language-html">&lt;button type=&quot;button&quot; class=&quot;mb-btn&quot; data-mb=&quot;{{put:&amp;quot;hello&amp;quot;}}&quot;&gt;点我&lt;/button&gt;</code></pre>
+<p>用 <code>{#id}</code> 给按钮命名，以便作为输入框的回车键按钮：</p>
+
+<pre><code class="language-markbottom">[[点我]{{put:&quot;hello&quot;}}]{#btnid}</code></pre>
+<pre><code class="language-html">&lt;button type=&quot;button&quot; class=&quot;mb-btn&quot; id=&quot;btnid&quot; data-mb=&quot;{{put:&amp;quot;hello&amp;quot;}}&quot;&gt;点我&lt;/button&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li><code>[[ ]]</code> 的第一段是按钮文字，其余部分（执行语句）编译进 <code>data-mb</code>。</li>
+<li>按钮文字里可以写 <code>{:unicode:…:}</code>、<code>^{}</code> 等行内语法；也可以写 <code>$变量$</code>，在点击时求值（文字部分不存在时用 <code>$cntnt$</code> 得到空串）。</li>
+<li>按钮默认是 <code>&lt;button type=&quot;button&quot;&gt;</code>，避免在 <code>&lt;form&gt;</code> 里误触发提交。</li>
+<li>每一次点击都执行一次；执行顺序从左到右。</li>
+</ol>
+
+<hr>
+<h3>3.11 输入框</h3>
+<pre><code class="language-markbottom">:[placeholder](default content)-&gt;(#btnid){{put:&quot;primer&quot;+:$cntnt$}}</code></pre>
+<pre><code class="language-html">&lt;input type=&quot;text&quot; class=&quot;mb-input&quot; placeholder=&quot;placeholder&quot; value=&quot;default content&quot;
+       data-mb-enter=&quot;#btnid&quot; data-mb=&quot;{{put:&amp;quot;primer&amp;quot;+:$cntnt$}}&quot;&gt;
+&lt;button type=&quot;button&quot; id=&quot;btnid&quot; class=&quot;mb-btn&quot;&gt;确定&lt;/button&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li><code>:</code> 开头，<code>[ ]</code> 是 <code>placeholder</code>，<code>( )</code> 是默认内容（可省略）。</li>
+<li><code>-&gt;(#id)</code> 声明的是<strong>回车键所对应的那个按钮</strong>：在这个输入框里按下回车，等价于点击 id 为 <code>id</code> 的按钮（就像 HTML 表单里的默认提交按钮）。编译时写成 <code>data-mb-enter=&quot;#id&quot;</code>。</li>
+<li>输入框自己的执行语句在 <code>change</code> 时执行（失焦，或在框里按回车提交时），此时 <code>$cntnt$</code> 等于输入框当前的值。</li>
+<li><code>-&gt;(#id)</code> 省略时，回车不会去点任何按钮。</li>
+<li>编译时 <code>&quot;</code> 必须转义为 <code>&amp;quot;</code>。</li>
+<li>也可以用 <code>&lt;form&gt;</code> 实现：把输入框和 <code>#id</code> 那个按钮放进同一个 <code>&lt;form&gt;</code>，并让该按钮成为表单的默认提交按钮（<code>type=&quot;submit&quot;</code>），效果完全相同。</li>
+</ol>
+
+<hr>
+<h3>3.12 多行输入框</h3>
+<pre><code class="language-markbottom">[:[placeholder](default content){{put:&quot;primer&quot;+:$cntnt$}}]</code></pre>
+<pre><code class="language-html">&lt;textarea class=&quot;mb-input&quot; placeholder=&quot;placeholder&quot;
+          data-mb=&quot;{{put:&amp;quot;primer&amp;quot;+:$cntnt$}}&quot;&gt;default content&lt;/textarea&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li>就是在输入框语法外面多套一层 <code>[ ]</code>。</li>
+<li>内容里的换行原样保留。</li>
+<li>在 <code>change</code>（失焦）时触发。<code>-&gt;(#id)</code> 对多行输入框意义不大——回车在 <code>&lt;textarea&gt;</code> 里是换行——实现可以忽略它，或把它解释成 <code>Ctrl+Enter</code>。</li>
+<li>触发后编译成普通文本节点（不再可编辑），并保留原有换行（<code>white-space: pre-wrap</code>）。</li>
+</ol>
+
+<hr>
+<h3>3.13 选择框</h3>
+<pre><code class="language-markbottom">[;[placeholder][option1][option2][option3](default){{put:&quot;you selected&quot;+:$cntnt$}}]</code></pre>
+<pre><code class="language-html">&lt;!-- “(default)” 不是任何一个选项的文字，所以这里没有 option 带 selected --&gt;
+&lt;select class=&quot;mb-input&quot; data-mb=&quot;{{put:&amp;quot;you selected&amp;quot;+:$cntnt$}}&quot;&gt;
+  &lt;option value=&quot;&quot; disabled hidden&gt;placeholder&lt;/option&gt;
+  &lt;option value=&quot;option1&quot;&gt;option1&lt;/option&gt;
+  &lt;option value=&quot;option2&quot;&gt;option2&lt;/option&gt;
+  &lt;option value=&quot;option3&quot;&gt;option3&lt;/option&gt;
+&lt;/select&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li><code>[;</code> 开头，第一个 <code>[ ]</code> 是占位提示（对应一个 <code>disabled hidden</code> 的 <code>&lt;option&gt;</code>），之后每个 <code>[ ]</code> 是一个选项。</li>
+<li><code>( )</code> 里写<strong>要默认选中的选项文字</strong>，对应 <code>&lt;option selected&gt;</code>；省略时不预选。</li>
+<li>选中项变化时触发一次，<code>$cntnt$</code> 为选中项的文本。</li>
+<li>想要“显示文字”与“提交值”不同，写成 <code>[显示=值]</code>，编译成 <code>&lt;option value=&quot;值&quot;&gt;显示&lt;/option&gt;</code>。</li>
+</ol>
+
+<hr>
+<h3>3.14 标签</h3>
+<p><code>::Label</code> 生成一个 HTML <code>&lt;label&gt;</code>，作用就是 HTML <code>&lt;label&gt;</code> 的作用：<strong>把一段文字和一个可交互元素绑定在一起，点击这段文字就等于点击那个元素</strong>（聚焦输入框、勾选 checkbox 等）。</p>
+
+<p>基础形式：</p>
+
+<pre><code class="language-markbottom">::Label</code></pre>
+<pre><code class="language-html">&lt;label class=&quot;mb-label&quot;&gt;Label&lt;/label&gt;</code></pre>
+<p><strong>自动绑定</strong>：只要在标签<strong>后面</strong>紧跟着放一个可交互元素，它就会自动绑上去：</p>
+
+<pre><code class="language-markbottom">::user name: :[input your name]()</code></pre>
+<pre><code class="language-html">&lt;label class=&quot;mb-label&quot;&gt;user name
+  &lt;input type=&quot;text&quot; class=&quot;mb-input&quot; placeholder=&quot;input your name&quot;&gt;
+&lt;/label&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li>标签由 <code>::</code> 开始，结束位置取<strong>下面三者中最靠前的一个</strong>：一个 <code>:</code>（结束用的冒号）、第一个可交互元素的起始处（见规则 3）、行尾。所以下面三种写法<strong>完全等价</strong>（结尾的 <code>:</code> 和空格都可以省）：
+<pre><code class="language-markbottom"> ::user name: :[input your name]()
+ ::user name :[input your name]()
+ ::user name:[input your name]()</code></pre></li>
+<li><code>::文字:</code> 单独出现时编译为 <code>&lt;label class=&quot;mb-label&quot;&gt;文字&lt;/label&gt;</code>（没有绑定对象，就是个普通标签）。</li>
+<li>标签后面<strong>同一行内</strong>有可交互元素时，编译成包裹式：
+<pre><code class="language-html"> &lt;label class=&quot;mb-label&quot;&gt;文字 &lt;可交互元素&gt;&lt;/label&gt;</code></pre>
+<p> 点击文字即可聚焦 / 勾选，效果与点击控件本身相同。</p>
+</li>
+<li>解析器<strong>向后找第一个可交互元素</strong>当作绑定对象：它必须紧跟在结束位置之后（中间只允许有空格）；标签文字就是结束位置之前的内容。整行都找不到可交互元素时退化成普通 <code>&lt;label&gt;</code>。</li>
+<li>可绑定的元素有：输入框 <code>:[…](…)</code>、多行输入框 <code>[:…]</code>、选择框 <code>[;…]</code>、按钮 <code>[[…]]</code>、任务列表的 checkbox。</li>
+<li>绑定对象<strong>不需要</strong>用 <code>-&gt;(#id)</code> 指定——把元素放在标签后面就行（<code>-&gt;(#id)</code> 是 <a href="#311-输入框">3.11 输入框</a>里用来指定回车键按钮的语法）。</li>
+<li>结束用的 <code>:</code> 和空格都不是必需的，解析器靠“向后找第一个可交互元素”来断句；但仍<strong>建议</strong>写成 <code>::文字: 元素</code>（一个冒号 + 一个空格），最不容易产生歧义。</li>
+<li>标签文字里的 <code>:</code> 用 <code>\:</code> 转义；文字不得为空。</li>
+<li>与“按钮式连接”的区别：<code>&lt;a&gt;</code> 会跳转，<code>&lt;label&gt;</code> 只是把焦点 / 勾选交给控件，不改变页面位置。</li>
+</ol>
+
+<hr>
+<h3>3.15 转义符</h3>
+<pre><code class="language-markbottom">\n\&lt;\&gt;</code></pre>
+<pre><code class="language-html">&lt;br&gt;&amp;lt;&amp;gt;</code></pre>
+<table>
+<thead><tr><th>写法</th><th>输出</th></tr></thead>
+<tbody>
+<tr><td><code>\n</code></td><td>换行 <code>&lt;br&gt;</code></td></tr>
+<tr><td><code>\t</code></td><td>制表符</td></tr>
+<tr><td><code>\ </code></td><td>一个普通空格（防止被折叠/用于行首）</td></tr>
+<tr><td><code>\\</code></td><td>一个反斜杠 <code>\</code></td></tr>
+<tr><td><code>\&amp;</code></td><td><code>&amp;amp;</code></td></tr>
+<tr><td><code>\&lt;</code> <code>\&gt;</code></td><td><code>&amp;lt;</code> <code>&amp;gt;</code></td></tr>
+<tr><td><code>\</code> + 其它标点</td><td>该标点本身，且不再参与语法解析</td></tr>
+</tbody></table>
+
+<p><strong>规则</strong></p>
+
+<ol>
+<li>转义符<strong>优先级最高</strong>：<code>\X</code> 总是先被识别，<code>X</code> 之后不再做任何 mb / md 解析。</li>
+<li>一个 <code>\</code> 只作用于紧跟其后的<strong>一个</strong>字符。</li>
+<li><code>\n</code> 产生的换行只断行不空行；空行请用普通的空行。</li>
+<li>行尾的 <code>\</code>（后面是换行）表示“把下一行接上来”，不算转义。</li>
+</ol>
+
+<hr>
+<h3>3.16 原始文本</h3>
+<pre><code class="language-markbottom">[o[origin         al]o]</code></pre>
+<pre><code class="language-html">&lt;span class=&quot;mb-origin&quot;&gt;origin         al&lt;/span&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li><code>[o[</code> 与 <code>]o]</code> 之间的内容<strong>不做任何解析</strong>，连续空格、制表符、换行都原样保留。</li>
+<li>内容中要出现 <code>]o]</code> 时，用 <code>{/`=n}</code> 略过 n 次。</li>
+<li>与 md 的“行内代码 <code>`</code>”不同：原始文本<strong>不换字体</strong>、不做等宽处理，只保留空白；需要等宽请用代码。</li>
+</ol>
+
+<hr>
+<h3>3.17 原始转义符</h3>
+<p><code>\o</code> 后面紧跟的<strong>一个字符</strong>不会被解析，直接原样输出。</p>
+
+<pre><code class="language-markbottom">\o!\o[这不是一个链接](example.com)</code></pre>
+<pre><code class="language-html">![这不是一个链接](example.com)</code></pre>
+<p><code>![…](…)</code> 本来会被解析成一张图片，<code>\o</code> 分别挡住了 <code>!</code> 和 <code>[</code>，于是整段原样输出。</p>
+
+<p>单个字符的例子：</p>
+
+<pre><code class="language-markbottom">\o*星号还是星号\o*</code></pre>
+<pre><code class="language-html">*星号还是星号*</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li><code>\o</code> 与 <code>\</code> 一样，只作用于紧跟其后的<strong>一个</strong>字符；区别是它<strong>固定消费两个字符</strong>（<code>o</code> 只是个标识），所以可以安全地转义字母：<code>\on</code> 输出字母 <code>n</code>，而 <code>\n</code> 是换行。</li>
+<li>被 <code>\o</code> 转义掉的字符不再参与任何后续解析——mb 和 md 都不会解析它。</li>
+<li>想输出一个 <code>o</code> 本身，写 <code>\oo</code>（<code>\o</code> 吃掉第二个 <code>o</code>，只输出 <code>o</code>）。</li>
+<li>实现应当把 <code>\oX</code> 与 <code>\X</code> 一视同仁；但如果 <code>X</code> 是 <code>n</code>、<code>t</code> 这类具名转义的首字母，<code>\o</code> 形式一律按“字母本身”处理（<code>\on</code> → <code>n</code>，而 <code>\n</code> → 换行）。</li>
+<li>由于它只管一个字符，要挡住一整段内容时，需要给这段里每一个“能启动语法”的字符都加 <code>\o</code>。</li>
+<li>后面没有字符（行尾孤零零一个 <code>\o</code>）时按普通文字输出。</li>
+</ol>
+
+<hr>
+<h3>3.18 略过解析次数</h3>
+<pre><code class="language-markbottom">{/`=3}`test` ` `text</code></pre>
+<pre><code class="language-html">&lt;code&gt;test` ` `text&lt;/code&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li><code>{/`=n}</code> 放在代码块或原始文本块<strong>前面</strong>，声明“遇到结束标识时，<strong>前 n 次不结束</strong>”。</li>
+<li>它本身不产生输出。</li>
+<li><code>n</code> 省略时等价于 <code>1</code>。</li>
+<li>该语句对<strong>紧随其后的那一个块</strong>生效，不向后传递。</li>
+</ol>
+
+<hr>
+<h3>3.19 竖排文本</h3>
+<pre><code class="language-markbottom">「「竖排文本」」</code></pre>
+<pre><code class="language-html">&lt;span class=&quot;mb-vertical&quot;&gt;竖排文本&lt;/span&gt;</code></pre>
+<p>其他写法：</p>
+
+<pre><code class="language-markbottom">[|[竖排文本]|]</code></pre>
+<pre><code class="language-html">&lt;span class=&quot;mb-vertical&quot;&gt;竖排文本&lt;/span&gt;</code></pre>
+<p>竖排中的横排文本：</p>
+
+<pre><code class="language-markbottom">「「横排文本『『in』』竖排文本」」</code></pre>
+<pre><code class="language-html">&lt;span class=&quot;mb-vertical&quot;&gt;横排文本&lt;span class=&quot;mb-horizontal&quot;&gt;in&lt;/span&gt;竖排文本&lt;/span&gt;</code></pre>
+<p>其他写法：</p>
+
+<pre><code class="language-markbottom">[|[横排文本[-[in]-]竖排文本]|]</code></pre>
+<pre><code class="language-html">&lt;span class=&quot;mb-vertical&quot;&gt;横排文本&lt;span class=&quot;mb-horizontal&quot;&gt;in&lt;/span&gt;竖排文本&lt;/span&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li><code>「「…」」</code> 与 <code>[|[内容]|]</code> 等价；<code>『『…』』</code> 与 <code>[-[…]-]</code> 等价（后者只能在竖排块内使用）。</li>
+<li>竖排块内的拉丁字母、数字默认会随 <code>writing-mode</code> 一起旋转，需要保持直立时用 <code>text-orientation: upright</code>；「『』」的内层元素继承外层方向，所以是横排的。</li>
+<li>竖排块是<strong>行内级</strong>元素，可以放在段落、表格单元格和列表项里。</li>
+<li>竖排块内部可以再套竖排块（即恢复成竖排）。</li>
+<li>全角引号 <code>「」『』</code> 作为定界符时，成对出现才生效；单独出现按普通标点处理。</li>
+<li>竖排块里的<strong>换行会另起一列</strong>（编译成 <code>&lt;br&gt;</code>）。因为 <code>writing-mode: vertical-rl</code> 的块方向是从右往左，所以各列默认<strong>从右到左</strong>排列，第一列在最右端。</li>
+</ol>
+
+<hr>
+<h3>3.20 表格扩充语法</h3>
+<h4>3.20.1 延续符</h4>
+<ul>
+<li><code>[+]</code> 放置在某个表格单元格的里面，可以使上方的单元格和该单元格合成一个单元格。</li>
+<li><code>[+&gt;]</code> 放置在某个表格单元格的里面，可以使左侧的单元格和该单元格合成一个单元格。</li>
+</ul>
+
+<pre><code class="language-markbottom">| a | b |
+|---|---|
+| c | d |
+| [+] | e |
+| f | [+&gt;] |</code></pre>
+<pre><code class="language-html">&lt;table&gt;&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;a&lt;/td&gt;&lt;td&gt;b&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td rowspan=&quot;2&quot;&gt;c&lt;/td&gt;&lt;td&gt;d&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;e&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td colspan=&quot;2&quot;&gt;f&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;&lt;/table&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li><code>[+]</code> 向上合并，<code>[+&gt;]</code> 向左合并；连续写多个 <code>[+]</code> 可以跨多行。</li>
+<li>合并只能作用于<strong>同一行</strong>或<strong>同一列</strong>的相邻单元格，合并后该位置的单元格被删除。</li>
+<li>合并方向相反（向左、向上）时，从<strong>被合并掉的那个单元格</strong>开始数，行首表头也参与。（<strong>注意</strong>：隐藏某些行（如折叠）时，跨行的（这段推演已作废：正确做法是<strong>不要把行藏起来</strong>，见 3.7 末尾与 1.1 的 <code>.mb-fold-off</code>） <code>rowspan</code> 必须按“<strong>还看得见的行数</strong>”重算，否则浏览器会把被隐藏的行也算进 <code>rowspan</code>，把后面的行整片挤到右边、整张表看起来散架（重算时窗口要按<strong>全部行</strong>的子区间 <code>[R, R+原始跨度)</code> 去数里面可见的行，<strong>不能</strong>拿“可见行数组的下标”当行号去数）。参考做法：把原始跨度另存一份（如 <code>data-mb-span</code>），每次折叠切换后按当前可见行数重写 <code>rowspan</code>。）</li>
+</ol>
+
+<h4>3.20.2 斜线</h4>
+<ul>
+<li><code>%( 文本1 / 文本2 )</code> 将会在表格中显示斜线以分隔文本，从左下到右上每条线汇聚在左下角。</li>
+<li><code>( 文本1 / 文本2 )%</code> 将会在表格中显示斜线以分隔文本，从左下到右上每条线汇聚在右上角。</li>
+<li><code>%( 文本1 \ 文本2 )</code> 将会在表格中显示斜线以分隔文本，从右下到左上每条线汇聚在左上角。</li>
+<li><code>( 文本1 \ 文本2 )%</code> 将会在表格中显示斜线以分隔文本，从右下到左上每条线汇聚在右下角。</li>
+</ul>
+
+<pre><code class="language-markbottom">| %( 项目 / 月份 )% | 一月 | 二月 |
+|---|---|---|
+| 收入 | 100 | 120 |</code></pre>
+<pre><code class="language-html">&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+  &lt;th class=&quot;mb-slash mb-slash-u&quot;&gt;
+    &lt;span class=&quot;mb-slash-head&quot;&gt;项目&lt;/span&gt;
+    &lt;span class=&quot;mb-slash-tail&quot;&gt;月份&lt;/span&gt;
+  &lt;/th&gt;
+  &lt;th&gt;一月&lt;/th&gt;&lt;th&gt;二月&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;&lt;tr&gt;&lt;th scope=&quot;row&quot;&gt;收入&lt;/th&gt;&lt;td&gt;100&lt;/td&gt;&lt;td&gt;120&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;
+&lt;/table&gt;</code></pre>
+<p>三段以上时，文本同样按<strong>从左往右</strong>依次排进被斜线分割出来的各个块——本文档总览表的表头就是一个例子（<code>\</code> 型、汇聚在右下角）：</p>
+
+<pre><code class="language-markbottom">| ( 语法 \ 示例 \ 格式 )% || mbmd | html |
+|---|---|---|</code></pre>
+<pre><code class="language-html">&lt;tr&gt;
+  &lt;th class=&quot;mb-slash mb-slash-d&quot;&gt;
+    &lt;svg class=&quot;mb-slash-fan&quot; viewBox=&quot;0 0 100 100&quot; preserveAspectRatio=&quot;none&quot; aria-hidden=&quot;true&quot;&gt;
+      &lt;line x1=&quot;50&quot; y1=&quot;0&quot; x2=&quot;100&quot; y2=&quot;100&quot;&gt;&lt;/line&gt;
+    &lt;/svg&gt;
+    &lt;span class=&quot;mb-slash-head&quot;&gt;语法&lt;/span&gt;
+    &lt;span class=&quot;mb-slash-mid&quot;&gt;示例&lt;/span&gt;
+    &lt;span class=&quot;mb-slash-tail&quot;&gt;格式&lt;/span&gt;
+  &lt;/th&gt;
+  &lt;th&gt;mbmd&lt;/th&gt;&lt;th&gt;html&lt;/th&gt;
+&lt;/tr&gt;</code></pre>
+<blockquote>
+<p>第一条线（串角的对角线）由 <code>.mb-slash-d</code> 的 <code>::before</code> 负责；三段以上的附加线用 <code>.mb-slash-fan</code> 里的内联 SVG 画。线的落点由实现决定，标准只规定“<strong>所有线都过汇聚角</strong>”和“<strong>文本从左往右依次填入</strong>”。</p>
+</blockquote>
+
+<p><strong>规则</strong></p>
+
+<ol>
+<li>定界符 <code>%(</code> / <code>)%</code> 的位置决定<strong>线的汇聚角</strong>：写在前面的 <code>%</code> 表示汇聚角在左（配合 <code>/</code> 即左下，配合 <code>\</code> 即左上）；写在后面的 <code>%</code> 表示汇聚角在右（配合 <code>/</code> 即右上，配合 <code>\</code> 即右下）。<strong><code>%</code> 只能出现在一侧</strong>——两侧都写（<code>%( … )%</code>）是非法写法，实现应当原样输出并给出警告。</li>
+<li><code>/</code> 型斜线用 <code>mb-slash-u</code>（左下→右上），<code>\</code> 型用 <code>mb-slash-d</code>（左上→右下）。</li>
+<li>单元格内的文本按书写顺序，<strong>从左往右</strong>依次填入被斜线分割出来的各个块：
+<ul>
+<li><code>/</code> 型（左下→右上）分割出的块从左往右是「<strong>左上</strong> → <strong>右下</strong>」，所以第一段填左上、最后一段填右下；</li>
+<li><code>\</code> 型（左上→右下）分割出的块从左往右是「<strong>左下</strong> → <strong>右上</strong>」，所以第一段填左下、最后一段填右上。</li>
+</ul>
+
+<p> 三段以上时同样按从左往右的顺序沿汇聚角扇形排开。</p>
+</li>
+<li>斜线单元格里不能再放 <code>[+]</code> / <code>[+&gt;]</code>。</li>
+<li>斜线单元格必须使用绝对定位的 <code>&lt;span&gt;</code> 承载文字，因为斜线本身由 <code>::before</code> 绘制。</li>
+</ol>
+
+<h4>3.20.3 侧边表头</h4>
+<p>每行 <code>||</code> 之前的单元格将是侧边表头，与表头显示为相同颜色</p>
+
+<pre><code class="language-markbottom">| %( 班级 \ 姓名 ) || 小明 | 小红 |
+|---|---|---|
+| 语文 || 90 | 88 |
+| 数学 || 95 | 92 |</code></pre>
+<pre><code class="language-html">&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+  &lt;th class=&quot;mb-slash mb-slash-d&quot;&gt;
+    &lt;span class=&quot;mb-slash-head&quot;&gt;班级&lt;/span&gt;
+    &lt;span class=&quot;mb-slash-tail&quot;&gt;姓名&lt;/span&gt;
+  &lt;/th&gt;
+  &lt;th&gt;小明&lt;/th&gt;&lt;th&gt;小红&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;th scope=&quot;row&quot;&gt;语文&lt;/th&gt;&lt;td&gt;90&lt;/td&gt;&lt;td&gt;88&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;th scope=&quot;row&quot;&gt;数学&lt;/th&gt;&lt;td&gt;95&lt;/td&gt;&lt;td&gt;92&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;</code></pre>
+<blockquote>
+<p>注意：<code>\</code> 是<strong>转义符</strong>，裸写在单元格里会被当成“转义一个空格”。所以表头要写成斜线单元格，把 <code>\</code> 放进 <code>%(</code> … <code>)</code> 中间。</p>
+</blockquote>
+
+<p><strong>规则</strong></p>
+
+<ol>
+<li><code>||</code> 之前的单元格编译为 <code>&lt;th scope=&quot;row&quot;&gt;</code>；<code>||</code> 本身不产生单元格。</li>
+<li>表头行（第一行）里的 <code>||</code> 之前部分同样编译为 <code>&lt;th&gt;</code>，并且是 <code>&lt;thead&gt;</code> 的第一个单元格。</li>
+<li>侧边表头可以与 <code>[+]</code>（跨行）、斜线同时使用。</li>
+<li>没有 <code>||</code> 的表格保持 md 原有行为。</li>
+</ol>
+
+<hr>
+<h3>3.21 图片 / 视频 / 音频</h3>
+<p><code>![替代文本](地址)</code> 与 md 的图片<strong>写法完全相同</strong>，但 mb 不把它限定为图片：它到底是图片、视频还是音频，<strong>由地址指向的文件内容决定</strong>——实现读取该文件开头的一小段字节，<strong>按文件头（magic number）或容器内部的标识</strong>判断类型，<strong>不允许用地址的后缀名判断</strong>。</p>
+
+<p>判据（示例）：</p>
+
+<table>
+<thead><tr><th>文件头 / 内部标识</th><th>类型</th></tr></thead>
+<tbody>
+<tr><td><code>\x89PNG</code>、<code>FF D8 FF</code>（JPEG）、<code>GIF8</code>、<code>BM</code>、<code>RIFF….WEBP</code>、<code>II*\0</code> / <code>MM\0*</code>、<code>00000100</code>（ICO）、<code>ftyp</code> + <code>avif</code>/<code>heic</code>，以及文本形式的 <code>&lt;svg</code></td><td>图片</td></tr>
+<tr><td><code>RIFF….AVI </code>、<code>1A45 DF A3</code>（WebM / MKV 且含视频轨）、<code>ftyp</code> 且含视频轨</td><td>视频</td></tr>
+<tr><td><code>ID3</code> 或 MPEG 帧同步（<code>FF Ex</code>）、<code>RIFF….WAVE</code>、<code>fLaC</code>、<code>OggS</code>、<code>FORM….AIFF</code>、<code>MThd</code></td><td>音频</td></tr>
+</tbody></table>
+
+<pre><code class="language-markbottom">![一只猫](cat.png)
+![一段视频](clip.webm)
+![一首歌](song.flac)</code></pre>
+<pre><code class="language-html">&lt;img src=&quot;cat.png&quot; alt=&quot;一只猫&quot;&gt;
+&lt;video class=&quot;mb-media&quot; controls preload=&quot;metadata&quot; src=&quot;clip.webm&quot;&gt;&lt;/video&gt;
+&lt;audio class=&quot;mb-media&quot; controls preload=&quot;metadata&quot; src=&quot;song.flac&quot;&gt;&lt;/audio&gt;</code></pre>
+<h4>音频的封面</h4>
+<p>音频文件常常自带封面图，应当把它显示在播放控件的<strong>上方</strong>：</p>
+
+<pre><code class="language-markbottom">![一首歌](song.mp3)</code></pre>
+<pre><code class="language-html">&lt;span class=&quot;mb-media-cover&quot;&gt;
+  &lt;img src=&quot;blob:…&quot; alt=&quot;一首歌&quot;&gt;
+  &lt;audio class=&quot;mb-media&quot; controls preload=&quot;metadata&quot; src=&quot;song.mp3&quot;&gt;&lt;/audio&gt;
+&lt;/span&gt;</code></pre>
+<p>封面按容器格式从这些位置取，有多个时取<strong>第一个</strong>：</p>
+
+<table>
+<thead><tr><th>容器</th><th>封面位置</th></tr></thead>
+<tbody>
+<tr><td>MP3</td><td>ID3v2 的 <code>APIC</code> 帧（ID3v2.2 是 <code>PIC</code> 帧）</td></tr>
+<tr><td>WAV</td><td><strong>非标准</strong>的 <code>ID3 </code>（也写作 <code>id3 </code> / <code>ID32</code>）块里的 ID3v2 <code>APIC</code> 帧</td></tr>
+<tr><td>FLAC</td><td><code>PICTURE</code> 元数据块（类型 6），或 Vorbis comment 里的 <code>METADATA_BLOCK_PICTURE</code>（base64 的 <code>PICTURE</code> 块）</td></tr>
+<tr><td>Ogg（Vorbis / Opus）</td><td>comment header 里的 <code>METADATA_BLOCK_PICTURE</code> 或 <code>COVERART</code>（base64）</td></tr>
+</tbody></table>
+
+<p>封面的 MIME 类型要<strong>按图片自己的魔数</strong>确定——ID3v2 里写的 MIME 可能是空的或错的。</p>
+
+<p><strong>规则</strong></p>
+
+<ol>
+<li>语法与 md 的图片一致：<code>![替代文本](地址)</code>；替代文本照旧写进 <code>alt</code>（音频有封面时，写进封面那个 <code>&lt;img&gt;</code> 的 <code>alt</code>）。</li>
+<li><strong>类型只看文件内容，不看后缀</strong>：<code>photo.jpg</code> 里装的若是 PNG 就按 PNG 处理；<code>song.txt</code> 里装的若是 FLAC 就按音频播放。</li>
+<li>图片输出 <code>&lt;img src alt&gt;</code>；视频输出 <code>&lt;video controls preload=&quot;metadata&quot; src=…&gt;&lt;/video&gt;</code>；音频输出 <code>&lt;audio controls preload=&quot;metadata&quot; src=…&gt;&lt;/audio&gt;</code>。视频 / 音频要带上 <code>max-width: 100%</code> 之类的约束，不要撑破容器。</li>
+<li>有封面时，封面与控件一起放进一个<strong>行内块</strong>容器 <code>.mb-media-cover</code>（封面在上、控件在下）。<strong>不要用 <code>&lt;figure&gt;</code></strong>：这段语法常常出现在 <code>&lt;p&gt;</code> 里，块级元素会把段落截断。</li>
+<li>这三种元素都是<strong>行内级</strong>的（<code>&lt;img&gt;</code>、<code>&lt;video&gt;</code>、<code>&lt;audio&gt;</code> 本身都是行内元素），可以放在段落、表格单元格与列表项里；要独占一行请用排版调整语句 <code>{|===|}</code>（见 <a href="#394-排版调整语句">3.9.4</a>）。</li>
+<li>编译时一律先输出<strong>基本形态</strong> <code>&lt;img&gt;</code>，等运行时判断出是视频 / 音频再替换成对应元素。这样即使<strong>没有脚本</strong>、或取不到内容，最差也只是显示成图片，不会整段消失。（参考实现会给这个 <code>&lt;img&gt;</code> 额外加一个 <code>data-mb-media=&quot;地址&quot;</code>，好让运行时知道该去探哪个地址——与 <code>data-mb</code> 一样，这只是<strong>实现约定</strong>，不属于标准，见第 0 节第 3 条。）</li>
+<li>判断类型必须读取内容，所以这一步<strong>需要脚本</strong>（与按钮、输入框、功能语句一样，见第 0 节第 2 条）；没有脚本时一律按图片输出。</li>
+<li>读取内容时应当<strong>只取需要的字节</strong>（用 <code>Range</code> 请求，或读够就停），不要把整个视频读进内存。</li>
+<li>取不到内容时（跨域、离线、404、本地文件）<strong>按图片输出</strong>，并在日志里说明原因；实现可以再退一步、用 <code>&lt;video preload=&quot;metadata&quot;&gt;</code> 的 <code>loadedmetadata</code> 事件探一次（能读出画面尺寸是视频、只有声音是音频），这一步不需要跨域许可。</li>
+<li>视频 / 音频应当带上<strong>可访问名称</strong>：写成 <code>![替代文本](地址)((描述))</code>（见 <a href="#322-aria-label无障碍标签">3.22</a>）；没有写 <code>((…))</code> 时，用替代文本当 <code>aria-label</code>。</li>
+</ol>
+
+<hr>
+<h3>3.22 aria-label（无障碍标签）</h3>
+<p>有些元素需要一段<strong>给读屏软件听的文字</strong>（视频、音频、只有图标或只有图片的按钮……）。mb 的写法是：在元素的<strong>后面</strong>紧跟一对双层圆括号：</p>
+
+<pre><code class="language-markbottom">![图片](url)((一张猫的照片))</code></pre>
+<pre><code class="language-html">&lt;img src=&quot;url&quot; alt=&quot;图片&quot; aria-label=&quot;一张猫的照片&quot;&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li><code>((描述))</code> 写在<strong>要加标签的元素后面</strong>，编译成 <code>aria-label=&quot;描述&quot;</code>；定位规则与命名语句（<a href="#31-命名语句与整体结构">3.1</a>）<strong>完全相同</strong>：
+<ul>
+<li>前面是一个<strong>完整的元素</strong> → 加在那个元素上；</li>
+<li>前面是<strong>普通文字</strong>（不是元素）→ 加在<strong>它所在的那个块</strong>上（标题 / 段落 / 列表项 / 表格单元格）。</li>
+</ul>
+</li>
+<li>单独成行时，作用到<strong>它上面</strong>的那个块；上面还没有块时，作用到<strong>下面的</strong>那个块。</li>
+<li>描述里的 <code>&quot;</code>、<code>&amp;</code>、<code>&lt;</code>、<code>&gt;</code> 要按属性值转义（与其它属性一样）。</li>
+<li>同一个元素上，命名语句与 <code>((…))</code> 可以一起用，先后不限：<code>![猫](cat.png){#cat}((一只猫))</code>。</li>
+<li><code>((…))</code> 是<strong>可选</strong>的；但对<strong>没有可见文字</strong>的元素（<a href="#321-图片--视频--音频">3.21</a> 的视频 / 音频、<a href="#396-图表生成语句">3.9.6</a> 的图表等）应当带上可访问名称。</li>
+<li>与 <code>_(…)_</code>（注解，见 <a href="#35-灰色--注解--涂黑的隐藏文本">3.5</a>）不同：注解是<strong>显示出来</strong>的可见文字，<code>((…))</code> 只写进属性，<strong>不显示</strong>。</li>
+<li>正文里想原样显示 <code>((</code> 时，用转义符 <code>\(</code>（见 <a href="#315-转义符">3.15</a>）。</li>
+</ol>
+
+<hr>
+<h2>附录 A：参考实现（mb.js）</h2>
+<blockquote>
+<p>本附录<strong>不属于标准的一部分</strong>，只是一份可以跑起来的最小运行时，用来演示第 0 节第 3 条里给出的 <code>data-mb</code> 约定。</p>
+</blockquote>
+
+<pre><code class="language-javascript">/* mb.js —— MarkBottom 0.1 参考运行时 */
+(function () {
+  'use strict';
+
+  /* ---------- 0. 内置变量 ---------- */
+  var GLOBAL = Object.create(null);
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function tick() {                       // 时间类变量：每次调用时重新取一次
+    var d = new Date();
+    GLOBAL.timeh = pad(d.getHours());
+    GLOBAL.timem = pad(d.getMinutes());
+    GLOBAL.times = pad(d.getSeconds());
+    GLOBAL.timeY = String(d.getFullYear());
+    GLOBAL.timeM = pad(d.getMonth() + 1);
+    GLOBAL.timeD = pad(d.getDate());
+  }
+  tick();
+  GLOBAL.browser = navigator.userAgent;
+  GLOBAL.os = navigator.platform ||
+    (navigator.userAgentData ? navigator.userAgentData.platform : '');
+
+  /* ---------- 1. 词法分析 ---------- */
+  var TOKEN_RE = new RegExp(
+    '\\s*(' +
+      '\\d+(?:\\.\\d+)?' +                     // 数字
+      '|&quot;(?:[^&quot;\\\\]|\\\\.)*&quot;' +               // 字符串
+      '|\\$[A-Za-z_][A-Za-z0-9_]*\\$' +        // 变量
+      '|\\+:|\\-:|%:|&gt;:' +                     // 字符串运算
+      '|\\+\\+|--|\\+=|-=|\\*=|\/=' +          // 赋值类
+      '|&gt;=|&lt;=|==|!=' +                         // 比较
+      '|\\.-|\\.\\+|\\.\\?' +                  // 取整
+      '|[+\\-*/%()\\[\\],=!|&amp;&lt;&gt;?:]' +          // 单字符
+    ')', 'y');
+
+  function tokenize(src) {
+    var out = [], i = 0, m;
+    while (i &lt; src.length) {
+      if (/\s/.test(src[i])) { i++; continue; }
+      TOKEN_RE.lastIndex = i;
+      m = TOKEN_RE.exec(src);
+      if (!m) throw new SyntaxError('非法字符：' + src[i]);
+      out.push(m[1]);
+      i = TOKEN_RE.lastIndex;
+    }
+    return out;
+  }
+
+  function truthy(v) {
+    return !(v === '' || v === 0 || v === '0' ||
+             v === false || v === null || v === undefined);
+  }
+
+  /* ---------- 2. 表达式求值（递归下降） ---------- */
+  function evaluate(src, scope) {
+    var toks = tokenize(src), p = 0;
+    var peek = function () { return toks[p]; };
+    var eat = function (t) { if (toks[p] === t) { p++; return true; } return false; };
+    var expect = function (t) {
+      if (!eat(t)) throw new SyntaxError('期望 “' + t + '”，实际是 “' + toks[p] + '”');
+    };
+    var getVar = function (n) {
+      if (n === 'cntnt') return scope.cntnt === undefined ? '' : scope.cntnt;
+      if (n in scope) return scope[n];
+      if (n in GLOBAL) return GLOBAL[n];
+      return '';
+    };
+    var setVar = function (n, v) {
+      if (n === 'cntnt') scope.cntnt = v; else scope[n] = v;
+      return v;
+    };
+
+    function conditional() {
+      var c = assignment();
+      if (eat('?')) {
+        var a = conditional();
+        expect(':');
+        var b = conditional();
+        return truthy(c) ? a : b;
+      }
+      return c;
+    }
+
+    function assignment() {
+      var t = peek();
+      if (t &amp;&amp; t.charAt(0) === '$') {
+        var name = t.slice(1, -1), op = toks[p + 1];
+        if (op === '=' || op === '+=' || op === '-=' || op === '*=' || op === '/=') {
+          p += 2;
+          var old = getVar(name), rhs = assignment();
+          if (op === '=')  return setVar(name, rhs);
+          if (op === '+=') return setVar(name, Number(old) + Number(rhs));
+          if (op === '-=') return setVar(name, Number(old) - Number(rhs));
+          if (op === '*=') return setVar(name, Number(old) * Number(rhs));
+          return setVar(name, Number(old) / Number(rhs));
+        }
+        if (op === '++' || op === '--') {
+          p += 2;
+          var v0 = Number(getVar(name));
+          setVar(name, op === '++' ? v0 + 1 : v0 - 1);
+          return v0;
+        }
+      }
+      return or();
+    }
+
+    function or() {
+      var v = and();
+      while (eat('|')) { var r = and(); v = truthy(v) || truthy(r); }
+      return v;
+    }
+    function and() {
+      var v = equ();
+      while (eat('&amp;')) { var r = equ(); v = truthy(v) &amp;&amp; truthy(r); }
+      return v;
+    }
+    function equ() {
+      var v = rel();
+      for (;;) {
+        if (eat('==')) v = (v == rel());
+        else if (eat('!=')) v = (v != rel());
+        else return v;
+      }
+    }
+    function rel() {
+      var v = strOps();
+      for (;;) {
+        if (eat('&gt;=')) v = (v &gt;= strOps());
+        else if (eat('&lt;=')) v = (v &lt;= strOps());
+        else if (eat('&gt;'))  v = (v &gt;  strOps());
+        else if (eat('&lt;'))  v = (v &lt;  strOps());
+        else return v;
+      }
+    }
+    function strOps() {
+      var v = add();
+      for (;;) {
+        if (eat('+:')) { v = String(v) + String(add()); }
+        else if (eat('-:')) { v = String(v).split(String(add())).join(''); }
+        else if (eat('%:')) {
+          var oldS = add();
+          if (!eat('&gt;:')) throw new SyntaxError('“%:” 必须与 “&gt;:” 配对使用');
+          v = String(v).split(String(oldS)).join(String(add()));
+        } else return v;
+      }
+    }
+    function add() {
+      var v = mul();
+      for (;;) {
+        if (eat('+')) v = Number(v) + Number(mul());
+        else if (eat('-')) v = Number(v) - Number(mul());
+        else return v;
+      }
+    }
+    function mul() {
+      var v = unary();
+      for (;;) {
+        if (eat('*')) v = Number(v) * Number(unary());
+        else if (eat('/')) v = Number(v) / Number(unary());
+        else if (eat('%')) v = Number(v) % Number(unary());
+        else return v;
+      }
+    }
+    function unary() {
+      if (eat('!')) return !truthy(unary());
+      if (eat('-')) return -Number(unary());
+      if (eat('+')) return Number(unary());
+      return postfix();
+    }
+    function postfix() {
+      var v = primary();
+      for (;;) {
+        if (eat('[')) {
+          var n = conditional();
+          expect(']');
+          v = String(v).charAt(Number(n) - 1);   // 从 1 开始计数
+        }
+        else if (eat('.-')) v = Math.floor(Number(v));
+        else if (eat('.+')) v = Math.ceil(Number(v));
+        else if (eat('.?')) v = Math.round(Number(v));
+        else return v;
+      }
+    }
+    function primary() {
+      var t = peek();
+      if (t === undefined) throw new SyntaxError('表达式意外结束');
+      if (/^\d/.test(t)) { p++; return parseFloat(t); }
+      if (t.charAt(0) === '&quot;') { p++; return JSON.parse(t); }
+      if (t.charAt(0) === '$') { p++; return getVar(t.slice(1, -1)); }
+      if (eat('(')) { var v = conditional(); expect(')'); return v; }
+      throw new SyntaxError('无法解析：“' + t + '”');
+    }
+
+    var value = conditional();
+    if (p !== toks.length) {
+      throw new SyntaxError('表达式未完全解析：“' + toks.slice(p).join(' ') + '”');
+    }
+    return value;
+  }
+
+  /* ---------- 3. 语句切分与执行 ---------- */
+  function splitCalls(inner) {
+    var calls = [], i = 0;
+    while (i &lt; inner.length) {
+      if (inner.charAt(i) !== '{') { i++; continue; }
+      var depth = 1, j = i + 1, inStr = false;
+      while (j &lt; inner.length &amp;&amp; depth &gt; 0) {
+        var c = inner.charAt(j);
+        if (inStr) {
+          if (c === '\\') j++;
+          else if (c === '&quot;') inStr = false;
+        } else if (c === '&quot;') inStr = true;
+        else if (c === '{') depth++;
+        else if (c === '}') depth--;
+        j++;
+      }
+      calls.push(inner.slice(i + 1, j - 1));
+      i = j;
+    }
+    return calls;
+  }
+
+  var rplcStartMark = null, rplcEndMark = null;
+
+  function insertMark(anchor) {
+    var m = document.createComment('mb');
+    anchor.after(m);
+    return m;
+  }
+
+  function execOne(name, arg, anchor, scope) {
+    var val = function () {
+      return arg === undefined ? '' : evaluate(arg, scope);
+    };
+    switch (name) {
+      case 'v': case 'l':
+        break;                                     // 元信息，无输出
+      case 'put':
+        anchor.insertAdjacentText('afterend', String(val()));
+        break;
+      case 'rplcStart':
+        rplcStartMark = insertMark(anchor);
+        break;
+      case 'rplcEnd':
+        rplcEndMark = insertMark(anchor);
+        break;
+      case 'rplc':
+        if (rplcStartMark &amp;&amp; rplcEndMark) {
+          var range = document.createRange();
+          range.setStartAfter(rplcStartMark);
+          range.setEndBefore(rplcEndMark);
+          range.deleteContents();
+          range.insertNode(document.createTextNode(String(val())));
+          rplcStartMark.remove();
+          rplcEndMark.remove();
+          rplcStartMark = rplcEndMark = null;
+        } else {
+          console.warn('[mb] rplc 找不到配对的 rplcStart / rplcEnd');
+        }
+        break;
+      default:
+        console.warn('[mb] 未知函数：' + name);
+    }
+  }
+
+  function runScript(script, anchor, scope) {
+    // script 形如 {{fn:arg}{fn:arg}}，先剥掉最外层的 { 和 }
+    var inner = script.slice(1, -1);
+    splitCalls(inner).forEach(function (call) {
+      var k = call.indexOf(':');
+      var name = (k &lt; 0 ? call : call.slice(0, k)).trim();
+      var arg = k &lt; 0 ? undefined : call.slice(k + 1);
+      try {
+        execOne(name, arg, anchor, scope);
+      } catch (e) {
+        console.warn('[mb] ' + name + ' 执行失败：' + e.message);
+      }
+    });
+  }
+
+  /* ---------- 4. 触发器 ---------- */
+  function scopeOf(el) {
+    var scope = Object.create(null);
+    if (el.matches('input, textarea, select')) {
+      scope.cntnt = el.value;
+    } else {
+      scope.cntnt = el.textContent;
+    }
+    return scope;
+  }
+
+  function fire(el) {
+    if (!el.dataset.mb) return;
+    tick();                    // 时间类变量在调用时自动刷新
+    runScript(el.dataset.mb, el, scopeOf(el));
+  }
+
+  function init(root) {
+    root = root || document;
+
+    // 单独成行的执行语句：加载后自动执行
+    root.querySelectorAll('.mb-exec[data-mb]').forEach(fire);
+
+    // 按钮 / 按钮式连接
+    root.querySelectorAll('button[data-mb], a.mb-btn[data-mb]').forEach(function (el) {
+      el.addEventListener('click', function (e) { e.preventDefault(); fire(el); });
+    });
+
+    // 输入控件：change（失焦 / 回车提交）时执行自己的执行语句
+    root.querySelectorAll('input[data-mb], textarea[data-mb], select[data-mb]')
+      .forEach(function (el) {
+        el.addEventListener('change', function () { fire(el); });
+      });
+
+    // 回车键对应的按钮：-&gt;(#id)
+    root.querySelectorAll('[data-mb-enter]').forEach(function (el) {
+      el.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        var btn = document.querySelector(el.dataset.mbEnter);
+        if (btn) btn.click();
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { init(); });
+  } else {
+    init();
+  }
+
+  window.mb = { init: init, evaluate: evaluate, run: runScript, vars: GLOBAL };
+})();</code></pre>
+<p>一个可以直接打开的完整小例子：</p>
+
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;zh-CN&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;title&gt;mb 交互示例&lt;/title&gt;
+&lt;style&gt;
+.mb-btn { display:inline-block; padding:.1em .8em; border:1px solid #aaa; border-radius:.35em;
+          background:#f4f4f4; font:inherit; cursor:pointer; }
+.mb-input { font:inherit; padding:.1em .4em; border:1px solid #aaa; border-radius:.25em; }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;p&gt;1 + 1 = 2&lt;/p&gt;
+&lt;input id=&quot;in1&quot; class=&quot;mb-input&quot; value=&quot;primer&quot; data-mb-enter=&quot;#go1&quot;
+       data-mb=&quot;{{put:&amp;quot;结果：&amp;quot;+:$cntnt$+&amp;quot; / 长度&amp;quot;+:$cntnt$[1]}}&quot;&gt;
+&lt;button type=&quot;button&quot; id=&quot;go1&quot; class=&quot;mb-btn&quot;&gt;执行&lt;/button&gt;
+&lt;script src=&quot;mb.js&quot;&gt;&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+<hr>
+<h2>附录 B：解析规则与优先级</h2>
+<ol>
+<li><strong>转义优先</strong>：<code>\</code> 与紧跟其后的一个字符总是最先被识别；<code>\o</code> 是它的两字符写法，同样只转义紧跟其后的一个字符。被转义的内容不再参与任何后续解析。</li>
+<li><strong>就近配对</strong>：所有成对定界符按“向左找最近的未配对开始符”匹配。因此 <code>【a|【b|c】】</code> 的内层先闭合。</li>
+<li><strong>内层先解析</strong>：嵌套结构中，内层的内容先完成解析，结果再作为外层的内容。唯一的例外是上标 / 下标——它们内部<strong>不再</strong>解析上标 / 下标（见 3.4），但其它行内语法照常解析。</li>
+<li><strong>块级先于行内</strong>：折叠块、代码块、表格、原始文本等块级构造先切分，再对每一块做行内解析。</li>
+<li><strong>mb 优先于 md</strong>：当同一位置既能匹配 md 又能匹配 mb 时，取 mb。例如 <code>_[a]_</code> 是下标、<code>_(a)_</code> 是注解（都不是斜体），<code>_a_</code> 是下划线（斜体一律用 <code>*a*</code>）；<code>~[a][b]</code> 是折叠块而不是 md 的删除线。</li>
+<li><strong>长定界符优先</strong>：<code>-&gt;[...]&lt;-</code> 优先于 <code>-[...]-</code>，<code>[-[...]-]</code> 优先于 <code>-[...]-</code>，<code>[|[…]|]</code> 和 <code>[[…]]</code> 优先于 <code>[</code>，<code>+:</code> <code>-:</code> <code>%:</code> <code>&gt;:</code> 优先于 <code>+</code> <code>-</code> <code>%</code> <code>&gt;</code>，<code>.-</code> <code>.+</code> <code>.?</code> 优先于单独的 <code>.</code>。</li>
+<li><strong>不可跨空行</strong>：所有行内语法（ruby、变大、上色、转义符……）不得跨越空行，跨空行时按未闭合处理，原样输出。</li>
+<li><strong>未闭合即原样输出</strong>：任何未配对的定界符都按普通文本输出，不得吞掉后续内容。</li>
+<li><strong>输出必须转义</strong>：所有来自文档内容的文本在写入 HTML 时都要转义 <code>&amp; &lt; &gt;</code>；只有实现明确支持的属性（如 <code>data-mb</code>）才做属性值转义。</li>
+<li><strong>空白</strong>：定界符与内容之间的<strong>首尾各一个空格</strong>不参与内容（<code>【 汉字 | han 】</code> 等价于 <code>【汉字|han】</code>）；内容中间的空格全部保留。</li>
+<li><strong>大小写</strong>：语法关键字（<code>greek</code>、<code>put</code>、<code>rplcStart</code>…）区分大小写；HTML 标签名与属性名不区分。</li>
+<li><strong>向前兼容</strong>：遇到不认识的 mb 语法，实现必须<strong>原样输出</strong>，不得报错丢弃。</li>
+</ol>
+
+<hr>
+<script>
+/* mb.js —— MarkBottom 0.1 参考运行时 */
+(function () {
+  'use strict';
+  var GLOBAL = Object.create(null);
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function tick() {
+    var d = new Date();
+    GLOBAL.timeh = pad(d.getHours());
+    GLOBAL.timem = pad(d.getMinutes());
+    GLOBAL.times = pad(d.getSeconds());
+    GLOBAL.timeY = String(d.getFullYear());
+    GLOBAL.timeM = pad(d.getMonth() + 1);
+    GLOBAL.timeD = pad(d.getDate());
+  }
+  tick();
+  GLOBAL.browser = navigator.userAgent;
+  GLOBAL.os = navigator.platform ||
+    (navigator.userAgentData ? navigator.userAgentData.platform : '');
+
+  var TOKEN_RE = new RegExp(
+    '\\s*(' +
+      '\\d+(?:\\.\\d+)?' +
+      '|"(?:[^"\\\\]|\\\\.)*"' +
+      '|\\$[A-Za-z_][A-Za-z0-9_]*\\$' +
+      '|\\+:|\\-:|%:|>:' +
+      '|\\+\\+|--|\\+=|-=|\\*=|\/=' +
+      '|>=|<=|==|!=' +
+      '|\\.-|\\.\\+|\\.\\?' +
+      '|[+\\-*/%()\\[\\],=!|&<>?:]' +
+    ')', 'y');
+
+  function tokenize(src) {
+    var out = [], i = 0, m;
+    while (i < src.length) {
+      if (/\s/.test(src[i])) { i++; continue; }
+      TOKEN_RE.lastIndex = i;
+      m = TOKEN_RE.exec(src);
+      if (!m) throw new SyntaxError('非法字符：' + src[i]);
+      out.push(m[1]);
+      i = TOKEN_RE.lastIndex;
+    }
+    return out;
+  }
+  function truthy(v) {
+    return !(v === '' || v === 0 || v === '0' || v === false || v === null || v === undefined);
+  }
+  function evaluate(src, scope) {
+    var toks = tokenize(src), p = 0;
+    var peek = function () { return toks[p]; };
+    var eat = function (t) { if (toks[p] === t) { p++; return true; } return false; };
+    var expect = function (t) { if (!eat(t)) throw new SyntaxError('期望 “' + t + '”'); };
+    var getVar = function (n) {
+      if (n === 'cntnt') return scope.cntnt === undefined ? '' : scope.cntnt;
+      if (n in scope) return scope[n];
+      if (n in GLOBAL) return GLOBAL[n];
+      return '';
+    };
+    var setVar = function (n, v) { if (n === 'cntnt') scope.cntnt = v; else scope[n] = v; return v; };
+    function conditional() {
+      var c = assignment();
+      if (eat('?')) { var a = conditional(); expect(':'); var b = conditional(); return truthy(c) ? a : b; }
+      return c;
+    }
+    function assignment() {
+      var t = peek();
+      if (t && t.charAt(0) === '$') {
+        var name = t.slice(1, -1), op = toks[p + 1];
+        if (op === '=' || op === '+=' || op === '-=' || op === '*=' || op === '/=') {
+          p += 2;
+          var old = getVar(name), rhs = assignment();
+          if (op === '=')  return setVar(name, rhs);
+          if (op === '+=') return setVar(name, Number(old) + Number(rhs));
+          if (op === '-=') return setVar(name, Number(old) - Number(rhs));
+          if (op === '*=') return setVar(name, Number(old) * Number(rhs));
+          return setVar(name, Number(old) / Number(rhs));
+        }
+        if (op === '++' || op === '--') {
+          p += 2; var v0 = Number(getVar(name));
+          setVar(name, op === '++' ? v0 + 1 : v0 - 1); return v0;
+        }
+      }
+      return or();
+    }
+    function or()  { var v = and(); while (eat('|')) { var r = and(); v = truthy(v) || truthy(r); } return v; }
+    function and() { var v = equ(); while (eat('&')) { var r = equ(); v = truthy(v) && truthy(r); } return v; }
+    function equ() {
+      var v = rel();
+      for (;;) { if (eat('==')) v = (v == rel()); else if (eat('!=')) v = (v != rel()); else return v; }
+    }
+    function rel() {
+      var v = strOps();
+      for (;;) {
+        if (eat('>=')) v = (v >= strOps());
+        else if (eat('<=')) v = (v <= strOps());
+        else if (eat('>')) v = (v > strOps());
+        else if (eat('<')) v = (v < strOps());
+        else return v;
+      }
+    }
+    function strOps() {
+      var v = add();
+      for (;;) {
+        if (eat('+:')) { v = String(v) + String(add()); }
+        else if (eat('-:')) { v = String(v).split(String(add())).join(''); }
+        else if (eat('%:')) {
+          var oldS = add();
+          if (!eat('>:')) throw new SyntaxError('“%:” 必须与 “>:” 配对');
+          v = String(v).split(String(oldS)).join(String(add()));
+        } else return v;
+      }
+    }
+    function add() {
+      var v = mul();
+      for (;;) {
+        if (eat('+')) v = Number(v) + Number(mul());
+        else if (eat('-')) v = Number(v) - Number(mul());
+        else return v;
+      }
+    }
+    function mul() {
+      var v = unary();
+      for (;;) {
+        if (eat('*')) v = Number(v) * Number(unary());
+        else if (eat('/')) v = Number(v) / Number(unary());
+        else if (eat('%')) v = Number(v) % Number(unary());
+        else return v;
+      }
+    }
+    function unary() {
+      if (eat('!')) return !truthy(unary());
+      if (eat('-')) return -Number(unary());
+      if (eat('+')) return Number(unary());
+      return postfix();
+    }
+    function postfix() {
+      var v = primary();
+      for (;;) {
+        if (eat('[')) { var n = conditional(); expect(']'); v = String(v).charAt(Number(n) - 1); }
+        else if (eat('.-')) v = Math.floor(Number(v));
+        else if (eat('.+')) v = Math.ceil(Number(v));
+        else if (eat('.?')) v = Math.round(Number(v));
+        else return v;
+      }
+    }
+    function primary() {
+      var t = peek();
+      if (t === undefined) throw new SyntaxError('表达式意外结束');
+      if (/^\d/.test(t)) { p++; return parseFloat(t); }
+      if (t.charAt(0) === '"') { p++; return JSON.parse(t); }
+      if (t.charAt(0) === '$') { p++; return getVar(t.slice(1, -1)); }
+      if (eat('(')) { var v = conditional(); expect(')'); return v; }
+      throw new SyntaxError('无法解析：“' + t + '”');
+    }
+    var value = conditional();
+    if (p !== toks.length) throw new SyntaxError('表达式未完全解析');
+    return value;
+  }
+
+  function splitCalls(inner) {
+    var calls = [], i = 0;
+    while (i < inner.length) {
+      if (inner.charAt(i) !== '{') { i++; continue; }
+      var depth = 1, j = i + 1, inStr = false;
+      while (j < inner.length && depth > 0) {
+        var c = inner.charAt(j);
+        if (inStr) { if (c === '\\') j++; else if (c === '"') inStr = false; }
+        else if (c === '"') inStr = true;
+        else if (c === '{') depth++;
+        else if (c === '}') depth--;
+        j++;
+      }
+      calls.push(inner.slice(i + 1, j - 1));
+      i = j;
+    }
+    return calls;
+  }
+
+  // 文档级共享的变量：赋值语句（{`$a=1`}）写下的变量，别的语句、触发器都能用
+  var DOC_SCOPE = Object.create(null);
+  // trigger 记下来的“后面那串功能语句”：flag → { units: [...], anchor: 元素 }
+  var TRIGGERS = Object.create(null);
+  // call / use 比 trigger 先跑到时，先在这里排队，等页面加载完再补跑
+  var PENDING = [];
+  // 运行时做过的动作（转换器会把这份日志抓去显示，方便排查）
+  var MB_LOG = [];
+  function LOG(s) {
+    MB_LOG.push(s);
+    if (window.console && console.info) console.info('[mb] ' + s);
+  }
+
+  /* ---- 行内重解析：put / rplc 插进去的文本要当成 mb 文本再解析一遍 ----
+     只做行内语法，而且【不】再执行 {{…}} / {$…$} / {`…`} 这类功能语句（免得重复执行）。 */
+  var MB_ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+  function mbEsc(s) { return String(s).replace(/[&<>"]/g, function (c) { return MB_ESC[c]; }); }
+  function rubyLite(inner) {
+    var bar = -1, slash = -1, depth = 0, j;
+    for (j = 0; j < inner.length; j++) {
+      var cc = inner[j];
+      if (cc === '【') { depth++; continue; }
+      if (cc === '】') { depth--; continue; }
+      if (depth > 0) continue;
+      if ((cc === '|' || cc === '｜') && bar < 0 && slash < 0) bar = j;
+      else if ((cc === '/' || cc === '／') && slash < 0 && bar < 0) slash = j;
+    }
+    var i0 = bar >= 0 ? bar : slash, up = '', down = '';
+    if (i0 < 0) return '<ruby>' + mbEsc(inner) + '</ruby>';
+    var base = inner.slice(0, i0), after = inner.slice(i0 + 1);
+    if (bar >= 0) {
+      var s2 = after.indexOf('/');
+      if (s2 < 0) s2 = after.indexOf('／');
+      if (s2 >= 0) { up = after.slice(0, s2); down = after.slice(s2 + 1); } else up = after;
+    } else down = after;
+    var markU = '<rp>(</rp><rt>' + mbEsc(up) + '</rt><rp>)</rp>';
+    var markD = '<rp>(</rp><rt>' + mbEsc(down) + '</rt><rp>)</rp>';
+    if (up && down) {
+      return '<ruby class="mb-ruby-under"><ruby class="mb-ruby-over">' + mbEsc(base) + markU
+           + '</ruby>' + markD + '</ruby>';
+    }
+    if (down) return '<ruby class="mb-ruby-under">' + mbEsc(base) + markD + '</ruby>';
+    return '<ruby>' + mbEsc(base) + markU + '</ruby>';
+  }
+  function mbInline(s) {
+    var out = '', i = 0, n = s.length;
+    function plain(ch) { out += mbEsc(ch); }
+    while (i < n) {
+      var c = s[i], e, t = null;
+      if (c === '\\') {
+        var nx = s[i + 1];
+        if (nx === 'o' && s[i + 2] !== undefined) { plain(s[i + 2]); i += 3; continue; }
+        if (nx === undefined) { plain('\\'); i++; continue; }
+        var named = { n: '<br>', t: '\t', '<': '&lt;', '>': '&gt;', '&': '&amp;', '\\': '\\' };
+        out += (named[nx] !== undefined ? named[nx] : mbEsc(nx));
+        i += 2; continue;
+      }
+      if (s.startsWith('{{', i) || s.startsWith('{$', i) || s.startsWith('{`', i)) {
+        plain(c); i++; continue;                       // 功能语句不在运行时再执行
+      }
+      if (c === '`') {
+        e = s.indexOf('`', i + 1);
+        if (e > 0) { out += '<code>' + mbEsc(s.slice(i + 1, e)) + '</code>'; i = e + 1; continue; }
+      }
+      if (s.startsWith('**', i)) t = { o: '**', c: '**', tag: 'strong' };
+      else if (s.startsWith('__', i)) t = { o: '__', c: '__', tag: 'strong' };
+      else if (s.startsWith('~~', i)) t = { o: '~~', c: '~~', tag: 'del' };
+      else if (s.startsWith('<-[', i)) t = { o: '<-[', c: ']->', cls: 'mb-bigger' };
+      else if (s.startsWith('->[', i)) t = { o: '->[', c: ']<-', cls: 'mb-smaller' };
+      else if (s.startsWith('^[', i)) t = { o: '^[', c: ']^', tag: 'sup' };
+      else if (s.startsWith('_[', i)) t = { o: '_[', c: ']_', tag: 'sub' };
+      else if (s.startsWith('_(', i)) t = { o: '_(', c: ')_', cls: 'mb-commental' };
+      else if (s.startsWith('@(', i)) t = { o: '@(', c: ')@', cls: 'mb-gray' };
+      else if (s.startsWith('#(', i)) t = { o: '#(', c: ')#', cls: 'mb-blacked' };
+      else if (s.startsWith("!'", i)) t = { o: "!'", c: "'!", cls: 'mb-fgcolored' };
+      else if (s.startsWith('!,', i)) t = { o: '!,', c: ',!', cls: 'mb-bgcolored' };
+      else if (s.startsWith('!.', i)) t = { o: '!.', c: '.!', cls: 'mb-bgpartialcolored' };
+      else if (s.startsWith('!;', i)) t = { o: '!;', c: ';!', cls: 'mb-fgcolored mb-bgcolored' };
+      else if (s.startsWith('!:', i)) t = { o: '!:', c: ':!', cls: 'mb-fgcolored mb-bgpartialcolored' };
+      else if (s.startsWith('[|[', i)) t = { o: '[|[', c: ']|]', cls: 'mb-vertical' };
+      else if (c === '【') t = { o: '【', c: '】', ruby: true };
+      else if (c === '*') t = { o: '*', c: '*', tag: 'em' };
+      else if (c === '_') t = { o: '_', c: '_', tag: 'u' };
+      if (t) {
+        e = s.indexOf(t.c, i + t.o.length);
+        if (e >= 0) {
+          var inner2 = s.slice(i + t.o.length, e);
+          if (t.ruby) out += rubyLite(inner2);
+          else if (t.tag) out += '<' + t.tag + '>' + mbInline(inner2) + '</' + t.tag + '>';
+          else out += '<span class="' + t.cls + '">' + mbInline(inner2) + '</span>';
+          i = e + t.c.length; continue;
+        }
+      }
+      if (c === '<') {
+        var hm = /^<\/?[a-zA-Z][\w-]*(\s[^<>]*)?\/?>/.exec(s.slice(i));
+        if (hm) { out += hm[0]; i += hm[0].length; continue; }
+      }
+      if (c === '&') {
+        var ent = /^&[#a-zA-Z0-9]+;/.exec(s.slice(i));
+        if (ent) { out += ent[0]; i += ent[0].length; continue; }
+      }
+      plain(c); i++;
+    }
+    return out;
+  }
+  /* 把插入的文本按 mb 再解析一遍：与紧邻的文本节点合成一段再解析 */
+  function reparseText(node) {
+    try { reparseTextInner(node); }
+    catch (e) { LOG('再解析插入的文本时出错：' + e.message); }
+  }
+  function reparseTextInner(node) {
+    if (!node || node.nodeType !== 3 || !node.parentNode) return;
+    var p = node.parentNode, start = node, end = node, n;
+    while (start.previousSibling && start.previousSibling.nodeType === 3) start = start.previousSibling;
+    while (end.nextSibling && end.nextSibling.nodeType === 3) end = end.nextSibling;
+    var text = '';
+    for (n = start; n; n = n.nextSibling) { text += n.data; if (n === end) break; }
+    var tmp = document.createElement('div');
+    tmp.innerHTML = mbInline(text);
+    var ref = end.nextSibling;
+    for (n = start; n && n !== ref;) { var nx2 = n.nextSibling; p.removeChild(n); n = nx2; }
+    while (tmp.firstChild) p.insertBefore(tmp.firstChild, ref);
+  }
+  function insertAfter(anchor, text) {
+    if (!anchor || !anchor.parentNode) { LOG('put / rplc 的锚点已经不在页面里了'); return null; }
+    var node = document.createTextNode(text);
+    if (anchor.nextSibling) anchor.parentNode.insertBefore(node, anchor.nextSibling);
+    else anchor.parentNode.appendChild(node);
+    reparseText(node);
+    return node;
+  }
+  /* 找最近的一个带某个函数的锚点（不看执行顺序，只看文档位置） */
+  function nearestAnchor(node, word, dir) {
+    var list = document.querySelectorAll('[data-mb*="' + word + '"]'), best = null;
+    Array.prototype.forEach.call(list, function (el) {
+      if (el === node || !node.compareDocumentPosition) return;
+      var pos = node.compareDocumentPosition(el);
+      if (dir < 0) {
+        if (!(pos & Node.DOCUMENT_POSITION_PRECEDING)) return;
+        if (!best || (best.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) best = el;
+      } else {
+        if (!(pos & Node.DOCUMENT_POSITION_FOLLOWING)) return;
+        if (!best || (el.compareDocumentPosition(best) & Node.DOCUMENT_POSITION_FOLLOWING)) best = el;
+      }
+    });
+    return best;
+  }
+  function execOne(name, arg, anchor, scope) {
+    var val = function () { return arg === undefined ? '' : evaluate(arg, scope); };
+    switch (name) {
+      case 'v': case 'l': break;
+      case 't': document.title = String(val()); break;      // 设置页面标题
+      case 'calc': val(); break;                            // 只算不输出（触发器里的运算语句）
+      case 'put': {
+        var pv = String(val());
+        LOG('put：「' + (pv.length > 30 ? pv.slice(0, 30) + '…' : pv) + '」');
+        insertAfter(anchor, pv);
+        break;
+      }
+      case 'rplcStart': case 'rplcEnd':
+        (function () { var m = document.createComment('mb'); anchor.after(m); })();
+        break;
+      case 'rplc': {
+        var s = nearestAnchor(anchor, 'rplcStart', -1), e = nearestAnchor(anchor, 'rplcEnd', +1);
+        if (s && e) {
+          var range = document.createRange();
+          range.setStartAfter(s);
+          range.setEndBefore(e);
+          range.deleteContents();
+          var text = String(val());
+          if (text) { var nd = document.createTextNode(text); range.insertNode(nd); reparseText(nd); }
+          LOG('rplc：已替换成「' + text.slice(0, 30) + '」');
+          [s, e].forEach(function (mk) {
+            var p = mk.parentNode;
+            if (!p) return;
+            p.removeChild(mk);
+            // 标记那一格如果只剩空壳（空段落 + 空 .mb-exec），连它一起收掉，免得留一行空白
+            if (p.tagName === 'P' && !p.textContent.trim() && !p.querySelector('*:not(.mb-exec)')) {
+              p.parentNode.removeChild(p);
+            }
+          });
+        } else { LOG('rplc：找不到配对的 rplcStart / rplcEnd'); }
+        break;
+      }
+      case 'call': case 'use': {
+        var flag = String(val()), rec = TRIGGERS[flag];
+        if (!rec) {
+          // 可能 trigger 排在后面：先排队，init 结尾再补跑一次
+          PENDING.push({ name: name, flag: flag, anchor: anchor, scope: scope });
+          LOG(name + '：还没找到 trigger「' + flag + '」（先排队，等加载完再试）');
+          break;
+        }
+        var at = (name === 'call' && rec.anchor && rec.anchor.parentNode) ? rec.anchor : anchor;
+        LOG(name + '：' + flag + '（执行 ' + rec.units.length + ' 条语句：' + rec.units.join(' / ') + '）');
+        runUnits(rec.units, at, scope);
+        break;
+      }
+      default: LOG('未知函数：' + name + '（语句：' + (arg === undefined ? name : name + ':' + arg) + '）');
+    }
+  }
+  function runOne(call, anchor, scope) {
+    var k = call.indexOf(':');
+    var name = (k < 0 ? call : call.slice(0, k)).trim();
+    var arg = k < 0 ? undefined : call.slice(k + 1);
+    try { execOne(name, arg, anchor, scope); }
+    catch (e) { LOG('× ' + name + ' 执行失败：' + e.message + '（语句：' + call + '）'); }
+  }
+  function runUnits(units, anchor, scope) {
+    units.forEach(function (call) { runOne(call, anchor, scope); });
+  }
+  /* 把 {{a}}{{b}} 这种写法规范成 {{a}{b}}：不然分组数括号时会多出一层（最外层的一对由调用处切掉） */
+  function normalizeScript(s) {
+    return String(s).replace(/\}\}+\{+/g, '}{');
+  }
+  /* 紧跟在这个锚点后面的下一条“单独成行的执行语句”（给 trigger 后面另起一行写语句的情况用） */
+  function nextExec(el) {
+    var list = document.querySelectorAll('.mb-exec[data-mb]'), best = null;
+    Array.prototype.forEach.call(list, function (x) {
+      if (x === el || !el.compareDocumentPosition) return;
+      if (!(el.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING)) return;
+      if (!best || (x.compareDocumentPosition(best) & Node.DOCUMENT_POSITION_PRECEDING)) best = x;
+    });
+    return best;
+  }
+  function runScript(script, anchor, scope) {
+    var units = splitCalls(normalizeScript(script).slice(1, -1));
+    for (var i = 0; i < units.length; i++) {
+      var k = units[i].indexOf(':');
+      var nm = (k < 0 ? units[i] : units[i].slice(0, k)).trim();
+      if (nm === 'trigger') {
+        // trigger 后面（同一组）的语句：先不执行，按 flag 记下来，等 call / use 再跑
+        var flag = k < 0 ? '' : String(evaluate(units[i].slice(k + 1), scope));
+        var rest = units.slice(i + 1);
+        if (!rest.length) {
+          // 同一组里没写：把紧跟其后的那一条执行语句也收进来（但它不能是 call / use / trigger）
+          var nx = nextExec(anchor);
+          if (nx) {
+            var inner2 = normalizeScript(nx.dataset.mb).slice(1, -1);
+            var nm2 = (splitCalls(inner2)[0] || '').split(':')[0].trim();
+            if (nm2 !== 'call' && nm2 !== 'use' && nm2 !== 'trigger') {
+              rest = splitCalls(inner2);
+              nx.removeAttribute('data-mb');       // 已经被 trigger 收走，别再自己执行
+            }
+          }
+        }
+        TRIGGERS[flag] = { units: rest, anchor: anchor };
+        LOG('trigger 已登记：' + flag + '（' + rest.length + ' 条语句：' + rest.join(' / ') + '）');
+        return;
+      }
+      runOne(units[i], anchor, scope);
+    }
+  }
+  /* ---------- 4. 媒体：图片 / 视频 / 音频 ----------
+     类型一律按【文件内容】判断（文件头 magic number 或容器内部的标识），
+     【不看】地址的后缀：
+       图片 PNG·JPEG·GIF·BMP·WebP·TIFF·ICO·AVIF/HEIC·SVG
+       视频 AVI·WebM/MKV（含视频轨）·MP4/MOV/M4V（含视频轨）
+       音频 MP3(ID3)·WAVE·FLAC·Ogg·AIFF·MIDI·ADTS AAC·M4A
+     音频还要把内嵌封面抠出来：ID3v2 的 APIC（MP3，以及 WAV 里非标准的 ID3 块）、
+     FLAC 的 PICTURE 块、Vorbis comment 的 METADATA_BLOCK_PICTURE / COVERART。 */
+  var MEDIA_STEPS = [65536, 262144, 1048576, 4194304, 16777216];
+  var MEDIA_CACHE = Object.create(null);         // url → Promise<{kind, fmt, cover}>
+
+  function at(b, i, s) {
+    if (!b || i + s.length > b.length) return false;
+    for (var k = 0; k < s.length; k++) if (b[i + k] !== s.charCodeAt(k)) return false;
+    return true;
+  }
+  function txt(b, from, len) {
+    var s = '', i, end = Math.min(from + len, b.length);
+    for (i = from; i < end; i++) s += String.fromCharCode(b[i]);
+    return s;
+  }
+  function headStr(b) { return txt(b, 0, Math.min(b.length, 262144)); }
+  function hasAny(b, list) {
+    var s = headStr(b);
+    for (var i = 0; i < list.length; i++) if (s.indexOf(list[i]) >= 0) return true;
+    return false;
+  }
+  function syncsafe(b, i) {
+    return ((b[i] & 0x7f) << 21) | ((b[i + 1] & 0x7f) << 14) | ((b[i + 2] & 0x7f) << 7) | (b[i + 3] & 0x7f);
+  }
+  function le32(b, i) { return (b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24)) >>> 0; }
+  function be32(b, i) { return ((b[i] << 24) | (b[i + 1] << 16) | (b[i + 2] << 8) | b[i + 3]) >>> 0; }
+  function utf8(b, from, len) {
+    var s = '', i = from, end = Math.min(from + len, b.length), c, cp;
+    while (i < end) {
+      c = b[i++];
+      if (c < 0x80) s += String.fromCharCode(c);
+      else if (c < 0xE0) s += String.fromCharCode(((c & 0x1F) << 6) | (b[i++] & 0x3F));
+      else if (c < 0xF0) s += String.fromCharCode(((c & 0x0F) << 12) | ((b[i++] & 0x3F) << 6) | (b[i++] & 0x3F));
+      else {
+        cp = ((c & 0x07) << 18) | ((b[i++] & 0x3F) << 12) | ((b[i++] & 0x3F) << 6) | (b[i++] & 0x3F);
+        cp -= 0x10000;
+        s += String.fromCharCode(0xD800 + (cp >> 10), 0xDC00 + (cp & 0x3FF));
+      }
+    }
+    return s;
+  }
+  function looksLikeSvg(b) {
+    var s = txt(b, 0, Math.min(b.length, 2048)).replace(/^\uFEFF/, '');
+    if (!/^\s*</.test(s)) return false;
+    return /<svg[\s>]/i.test(s);
+  }
+  /* 只看内容判类型 */
+  function probeKind(b) {
+    if (!b || !b.length) return { kind: 'unknown', fmt: '' };
+    if (at(b, 0, '\x89PNG\r\n\x1a\n')) return { kind: 'image', fmt: 'png' };
+    if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return { kind: 'image', fmt: 'jpeg' };
+    if (at(b, 0, 'GIF87a') || at(b, 0, 'GIF89a')) return { kind: 'image', fmt: 'gif' };
+    if (at(b, 0, 'BM')) return { kind: 'image', fmt: 'bmp' };
+    if (at(b, 0, 'II\x2a\x00') || at(b, 0, 'MM\x00\x2a')) return { kind: 'image', fmt: 'tiff' };
+    if (b[0] === 0 && b[1] === 0 && b[2] === 1 && b[3] === 0) return { kind: 'image', fmt: 'ico' };
+    if (at(b, 0, 'RIFF')) {
+      if (at(b, 8, 'WEBP')) return { kind: 'image', fmt: 'webp' };
+      if (at(b, 8, 'WAVE')) return { kind: 'audio', fmt: 'wav' };
+      if (at(b, 8, 'AVI ')) return { kind: 'video', fmt: 'avi' };
+      return { kind: 'unknown', fmt: 'riff' };
+    }
+    if (at(b, 0, 'FORM') && (at(b, 8, 'AIFF') || at(b, 8, 'AIFC'))) return { kind: 'audio', fmt: 'aiff' };
+    if (at(b, 0, 'fLaC')) return { kind: 'audio', fmt: 'flac' };
+    if (at(b, 0, 'OggS')) return { kind: hasAny(b, ['theora']) ? 'video' : 'audio', fmt: 'ogg' };
+    if (at(b, 0, 'MThd')) return { kind: 'audio', fmt: 'midi' };
+    if (at(b, 0, 'ID3')) return { kind: 'audio', fmt: 'mp3' };
+    if (b[0] === 0xFF && (b[1] & 0xF6) === 0xF0) return { kind: 'audio', fmt: 'aac' };
+    if (b[0] === 0xFF && (b[1] & 0xE0) === 0xE0) {
+      var mver = (b[1] >> 3) & 3, mlay = (b[1] >> 1) & 3, mbit = (b[2] >> 4) & 15;
+      if (mver !== 1 && mlay !== 0 && mbit !== 0 && mbit !== 15) return { kind: 'audio', fmt: 'mp3' };
+    }
+    if (b[0] === 0x1A && b[1] === 0x45 && b[2] === 0xDF && b[3] === 0xA3) {
+      if (hasAny(b, ['V_VP8', 'V_VP9', 'V_AV1', 'V_MPEG', 'V_THEORA', 'V_MS'])) return { kind: 'video', fmt: 'webm' };
+      if (hasAny(b, ['A_VORBIS', 'A_OPUS', 'A_AAC', 'A_FLAC', 'A_MPEG', 'A_PCM'])) return { kind: 'audio', fmt: 'webm' };
+      return { kind: 'video', fmt: 'webm' };
+    }
+    if (at(b, 4, 'ftyp')) {
+      var brand = txt(b, 8, 4), hs = headStr(b);
+      if (/^(avif|avis|heic|heix|mif1|msf1)/.test(brand)) return { kind: 'image', fmt: 'heif' };
+      if (/^(M4A|M4B|M4P|F4A|F4B)/.test(brand)) return { kind: 'audio', fmt: 'm4a' };
+      if (hs.indexOf('soun') >= 0 && hs.indexOf('vide') < 0) return { kind: 'audio', fmt: 'm4a' };
+      if (/^(qt {2}|M4V|F4V|MSNV|3gp|3g2)/.test(brand)) return { kind: 'video', fmt: 'mov' };
+      return { kind: 'video', fmt: 'mp4' };
+    }
+    if (looksLikeSvg(b)) return { kind: 'image', fmt: 'svg' };
+    return { kind: 'unknown', fmt: '' };
+  }
+  function sniffMime(d) {
+    if (at(d, 0, '\x89PNG')) return 'image/png';
+    if (d[0] === 0xFF && d[1] === 0xD8) return 'image/jpeg';
+    if (at(d, 0, 'GIF8')) return 'image/gif';
+    if (at(d, 0, 'RIFF') && at(d, 8, 'WEBP')) return 'image/webp';
+    if (at(d, 0, 'BM')) return 'image/bmp';
+    return 'image/jpeg';
+  }
+  /* ID3v2 标签（MP3 的文件头；WAV 里非标准的 ID3 块也是它） */
+  function parseId3Tag(b) {
+    if (!at(b, 0, 'ID3')) return null;
+    var ver = b[3], flags = b[5], size = syncsafe(b, 6);
+    var end = Math.min(10 + size, b.length), body;
+    if (flags & 0x80) body = deUnsync(b, 10, end); else body = b.subarray(10, end);
+    var p = 0;
+    while (p + (ver === 2 ? 6 : 10) <= body.length) {
+      var id, fsize;
+      if (ver === 2) {
+        id = txt(body, p, 3);
+        fsize = (body[p + 3] << 16) | (body[p + 4] << 8) | body[p + 5];
+        p += 6;
+      } else {
+        id = txt(body, p, 4);
+        fsize = ver === 4 ? syncsafe(body, p + 4) : be32(body, p + 4);
+        p += 10;
+      }
+      if (!/^[A-Z0-9]{3,4}$/.test(id) || !fsize) break;
+      if (p + fsize > body.length) fsize = body.length - p;
+      if (id === 'APIC' || id === 'PIC') {
+        var pic = parseApic(body.subarray(p, p + fsize), ver);
+        if (pic) return pic;
+      }
+      p += fsize;
+    }
+    return null;
+  }
+  function deUnsync(b, from, to) {
+    var out = [], i;
+    for (i = from; i < to; i++) { out.push(b[i]); if (b[i] === 0xFF && b[i + 1] === 0x00) i++; }
+    return new Uint8Array(out);
+  }
+  function parseApic(f, ver) {
+    if (f.length < 4) return null;
+    var enc = f[0], q = 1, mime;
+    if (ver === 2) { mime = 'image/' + txt(f, q, 3).toLowerCase().replace('jpg', 'jpeg'); q += 3; }
+    else {
+      var e = q;
+      while (e < f.length && f[e] !== 0) e++;
+      mime = txt(f, q, e - q); q = e + 1;
+    }
+    q++;                                        // 图片类型（1 字节）
+    if (enc === 1 || enc === 2) {               // UTF-16：两字节的终止符
+      while (q + 1 < f.length && !(f[q] === 0 && f[q + 1] === 0)) q += 2;
+      q += 2;
+    } else {
+      while (q < f.length && f[q] !== 0) q++;
+      q++;
+    }
+    if (q >= f.length) return null;
+    var data = f.subarray(q);
+    if (!/^image\//i.test(mime || '')) mime = sniffMime(data);
+    return { mime: mime, data: data };
+  }
+  function parseFlacPicture(b, p, len) {
+    var end = Math.min(p + len, b.length);
+    if (p + 8 > end) return null;
+    p += 4;                                     // 图片类型
+    var ml = be32(b, p); p += 4;
+    if (p + ml > end) return null;
+    var mime = txt(b, p, ml); p += ml;
+    if (p + 4 > end) return null;
+    var dl = be32(b, p); p += 4 + dl;           // 描述
+    if (p + 20 > end) return null;
+    p += 16;                                    // 宽、高、色深、色数
+    var dataLen = be32(b, p); p += 4;
+    var data = b.subarray(p, Math.min(p + dataLen, end));
+    if (!data.length) return null;
+    if (!/^image\//i.test(mime || '')) mime = sniffMime(data);
+    return { mime: mime, data: data };
+  }
+  /* Vorbis comment（FLAC 的元数据块、Ogg 的 comment header 都是它） */
+  function parseVorbisComment(b, p, len) {
+    var end = Math.min(p + len, b.length), out = [], i, l;
+    if (p + 4 > end) return out;
+    l = le32(b, p); p += 4 + l;                 // vendor
+    if (p + 4 > end) return out;
+    var count = le32(b, p); p += 4;
+    for (i = 0; i < count && p + 4 <= end; i++) {
+      l = le32(b, p); p += 4;
+      out.push(utf8(b, p, Math.min(l, end - p)));
+      p += l;
+    }
+    return out;
+  }
+  function b64(s) {
+    var bin = atob(String(s).replace(/\s+/g, '')), out = new Uint8Array(bin.length), i;
+    for (i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i) & 0xFF;
+    return out;
+  }
+  function coverFromComments(list) {
+    var i, m, d;
+    for (i = 0; i < list.length; i++) {                 // 优先 METADATA_BLOCK_PICTURE
+      m = /^METADATA_BLOCK_PICTURE=(.*)$/i.exec(list[i]);
+      if (m) { try { d = b64(m[1]); } catch (e) { d = null; }
+               if (d && d.length) { var pic = parseFlacPicture(d, 0, d.length); if (pic) return pic; } }
+    }
+    for (i = 0; i < list.length; i++) {
+      m = /^COVERART=(.*)$/i.exec(list[i]);
+      if (m) { try { d = b64(m[1]); } catch (e) { d = null; }
+               if (d && d.length) return { mime: sniffMime(d), data: d }; }
+    }
+    return null;
+  }
+  function parseFlac(b) {                       // b 以 fLaC 开头
+    var p = 4, cover = null, comments = null;
+    while (p + 4 <= b.length) {
+      var h = b[p], last = h & 0x80, type = h & 0x7F;
+      var len = (b[p + 1] << 16) | (b[p + 2] << 8) | b[p + 3];
+      var base = p + 4;
+      if (base + len > b.length) return { cover: cover, more: true };   // 还没读全
+      if (type === 6 && !cover) cover = parseFlacPicture(b, base, len);
+      if (type === 4 && !comments) comments = parseVorbisComment(b, base, len);
+      p = base + len;
+      if (last || type === 127) break;
+    }
+    if (!cover && comments) cover = coverFromComments(comments);
+    return { cover: cover };
+  }
+  function joinChunks(chunks) {
+    var n = 0, i, off = 0;
+    for (i = 0; i < chunks.length; i++) n += chunks[i].length;
+    var out = new Uint8Array(n);
+    for (i = 0; i < chunks.length; i++) { out.set(chunks[i], off); off += chunks[i].length; }
+    return out;
+  }
+  function vorbisCommentsIn(packet) {
+    if (packet.length > 7 && at(packet, 0, '\x03vorbis')) return parseVorbisComment(packet, 7, packet.length - 7);
+    if (packet.length > 8 && at(packet, 0, 'OpusTags')) return parseVorbisComment(packet, 8, packet.length - 8);
+    return null;
+  }
+  function parseOgg(b) {                        // Ogg 的 comment header 一般在最前面几个包
+    var p = 0, chunks = [], packets = 0, comments = null, more = false;
+    function flush() {
+      var packet = joinChunks(chunks);
+      chunks = []; packets++;
+      if (!comments) comments = vorbisCommentsIn(packet);
+    }
+    outer:
+    while (p + 27 <= b.length && packets < 6) {
+      if (!at(b, p, 'OggS')) break;
+      var nseg = b[p + 26];
+      if (p + 27 + nseg > b.length) { more = true; break; }
+      var q = p + 27 + nseg;
+      for (var i = 0; i < nseg; i++) {
+        var L = b[p + 27 + i];
+        if (q + L > b.length) { more = true; break outer; }
+        chunks.push(b.subarray(q, q + L));
+        q += L;
+        if (L < 255) { flush(); if (packets >= 6) break outer; }
+      }
+      p = q;
+    }
+    return { cover: comments ? coverFromComments(comments) : null, more: more };
+  }
+  function parseWav(b) {                        // RIFF 里非标准的 ID3 块
+    if (!(at(b, 0, 'RIFF') && at(b, 8, 'WAVE'))) return { cover: null };
+    var p = 12;
+    while (p + 8 <= b.length) {
+      var id = txt(b, p, 4);
+      var size = (b[p + 4] | (b[p + 5] << 8) | (b[p + 6] << 16) | (b[p + 7] << 24)) >>> 0;
+      var base = p + 8;
+      if (id === 'ID3 ' || id === 'id3 ' || id === 'ID32') {
+        if (base + 10 > b.length) return { cover: null, more: true };
+        var pic = parseId3Tag(b.subarray(base, Math.max(base + size, base + 10)));
+        return { cover: pic };
+      }
+      if (size <= 0 || base + size > b.length) return { cover: null, more: true };
+      p = base + size + (size & 1);
+    }
+    return { cover: null, more: true };
+  }
+  function extractCover(bytes, fmt) {
+    try {
+      if (fmt === 'wav') return parseWav(bytes);
+      if (fmt === 'flac') return parseFlac(bytes);
+      if (fmt === 'ogg') return parseOgg(bytes);
+      if (fmt === 'mp3') {
+        if (!at(bytes, 0, 'ID3')) return { cover: null };           // 没有 ID3 标签
+        if (10 + syncsafe(bytes, 6) > bytes.length) return { cover: null, more: true };
+        return { cover: parseId3Tag(bytes) };
+      }
+    } catch (e) { LOG('读封面时出错（' + fmt + '）：' + e.message); }
+    return { cover: null };
+  }
+  /* 读地址开头的一段字节（优先 Range；不支持 / 被忽略时改成流式读、读够就停） */
+  function readPrefix(url, n) {
+    function joinBytes(chunks, got) {
+      var out = new Uint8Array(got), off = 0;
+      chunks.forEach(function (c) { out.set(c, off); off += c.length; });
+      return out;
+    }
+    function readSome(res) {
+      if (res.body && res.body.getReader) {
+        var reader = res.body.getReader(), chunks = [], got = 0;
+        function pump() {
+          return reader.read().then(function (r) {
+            if (r.done) return joinBytes(chunks, got);
+            chunks.push(r.value); got += r.value.length;
+            if (got >= n) {
+              try { var cp = reader.cancel(); if (cp && cp.catch) cp.catch(function () {}); } catch (e) {}
+              return joinBytes(chunks, got);
+            }
+            return pump();
+          });
+        }
+        return pump();
+      }
+      return res.arrayBuffer().then(function (buf) {
+        var b = new Uint8Array(buf);
+        return b.length > n ? b.subarray(0, n) : b;
+      });
+    }
+    function grab(opt) {
+      return fetch(url, opt).then(function (res) {
+        if (!res.ok && res.status !== 206) throw new Error('HTTP ' + res.status);
+        var total = 0, cr = res.headers.get('Content-Range'), cl = res.headers.get('Content-Length'), m;
+        if (cr) { m = /\/(\d+)\s*$/.exec(cr); if (m) total = parseInt(m[1], 10); }
+        if (!total && cl) total = parseInt(cl, 10);
+        return readSome(res).then(function (b) {
+          return { bytes: b, total: total || b.length };
+        });
+      });
+    }
+    return grab({ headers: { Range: 'bytes=0-' + (n - 1) } }).catch(function () {
+      return grab({});        // 有些服务器 / 浏览器不接受 Range，重来一次不带它
+    });
+  }
+  function probeAndCover(url) {
+    var i = 0;
+    function step() {
+      return readPrefix(url, MEDIA_STEPS[i]).then(function (r) {
+        var pr = probeKind(r.bytes);
+        if (pr.kind !== 'audio') return pr;
+        var got = extractCover(r.bytes, pr.fmt);
+        if (got.cover) { pr.cover = got.cover; return pr; }
+        i++;
+        var next = MEDIA_STEPS[i];
+        var whole = r.total && r.bytes.length >= r.total;
+        if (!got.more || !next || whole) return pr;
+        return step();          // 封面可能在更后面 → 多读一点
+      });
+    }
+    return step();
+  }
+  function mediaOf(url) {
+    if (!MEDIA_CACHE[url]) MEDIA_CACHE[url] = probeAndCover(url);
+    return MEDIA_CACHE[url];
+  }
+  function buildMedia(kind, url, alt, coverUrl) {
+    var box = document.createElement('span'), html;
+    if (kind === 'video') {
+      html = '<video class="mb-media" controls preload="metadata" src="' + mbEsc(url) + '"></video>';
+    } else if (coverUrl) {
+      html = '<span class="mb-media-cover"><img src="' + mbEsc(coverUrl) + '" alt="' + mbEsc(alt) + '">'
+           + '<audio class="mb-media" controls preload="metadata" src="' + mbEsc(url) + '"></audio></span>';
+    } else {
+      html = '<audio class="mb-media" controls preload="metadata" src="' + mbEsc(url) + '"></audio>';
+    }
+    box.innerHTML = html;
+    var made = box.firstChild;
+    var mediaEl = box.querySelector('video, audio') || made;
+    if (alt && !mediaEl.getAttribute('aria-label')) mediaEl.setAttribute('aria-label', alt);
+    return made;
+  }
+  /* 换成媒体元素时，把编译期写在 <img> 上的属性带过去（id / aria-label / role / title） */
+  function carryAttrs(from, to) {
+    ['id', 'aria-label', 'role', 'title'].forEach(function (k) {
+      var v = from.getAttribute(k);
+      if (!v || to.hasAttribute(k)) return;
+      if (k === 'aria-label') { var m = to.querySelector('video, audio'); (m || to).setAttribute(k, v); }
+      else to.setAttribute(k, v);
+    });
+  }
+  /* 取不到内容（跨域 / 本地文件）时的退路：拿一个 <video> 试读元数据——
+     能读出画面尺寸就是视频，只有声音就是音频，读不出就还是按图片 */
+  function probeByElement(url) {
+    return new Promise(function (res) {
+      var v, done = false;
+      function finish(kind) {
+        if (done) return;
+        done = true;
+        try { v.removeAttribute('src'); } catch (e) {}
+        res(kind);
+      }
+      try { v = document.createElement('video'); } catch (e) { res(null); return; }
+      v.preload = 'metadata';
+      v.muted = true;
+      v.addEventListener('loadedmetadata', function () { finish(v.videoWidth > 0 ? 'video' : 'audio'); });
+      v.addEventListener('error', function () { finish(null); });
+      setTimeout(function () { finish(null); }, 8000);
+      v.src = url;
+    });
+  }
+  function resolveMedia(el) {
+    var url = el.getAttribute('data-mb-media') || el.getAttribute('src') || '';
+    var alt = el.getAttribute('alt') || '';
+    if (!url || !window.fetch || !window.Promise) return;
+    mediaOf(url).then(function (pr) {
+      if (pr.kind === 'image') return;            // 图片：保持原样的 <img>，不往日志里刷
+      if (pr.kind === 'unknown') { LOG('媒体：「' + url + '」没认出文件头，按图片处理'); return; }
+      var cover = null;
+      if (pr.cover && pr.cover.data && pr.cover.data.length && window.Blob && window.URL) {
+        try { cover = URL.createObjectURL(new Blob([pr.cover.data], { type: pr.cover.mime })); } catch (e) { cover = null; }
+      }
+      var node = buildMedia(pr.kind, url, alt, cover);
+      carryAttrs(el, node);
+      if (el.parentNode) el.parentNode.replaceChild(node, el);
+      LOG('媒体：「' + url + '」→ ' + (pr.kind === 'video' ? '视频' : '音频')
+        + (cover ? '（内嵌封面 ' + Math.round(pr.cover.data.length / 1024) + ' KB）' : '（没有封面）'));
+    }).catch(function (e) {
+      LOG('媒体：「' + url + '」取不到文件头（' + e.message + '）——改用播放器探测');
+      probeByElement(url).then(function (kind) {
+        if (!kind) { LOG('媒体：「' + url + '」按图片处理'); return; }
+        var node2 = buildMedia(kind, url, alt, null);
+        carryAttrs(el, node2);
+        if (el.parentNode) el.parentNode.replaceChild(node2, el);
+        LOG('媒体：「' + url + '」→ ' + (kind === 'video' ? '视频' : '音频') + '（播放器探测，无封面）');
+      });
+    });
+  }
+
+  function scopeOf(el) {
+    if (el.matches && el.matches('input, textarea, select')) DOC_SCOPE.cntnt = el.value;
+    else DOC_SCOPE.cntnt = el.textContent;
+    return DOC_SCOPE;             // 文档级共享：赋值语句写的变量别处也能看到
+  }
+  function fire(el) {
+    if (!el.dataset.mb) return;
+    tick();
+    runScript(el.dataset.mb, el, scopeOf(el));
+  }
+  function init(root) {
+    root = root || document;
+    root.querySelectorAll('.mb-exec[data-mb]').forEach(fire);
+    root.querySelectorAll('button[data-mb], a.mb-btn[data-mb]').forEach(function (el) {
+      el.addEventListener('click', function (e) { e.preventDefault(); fire(el); });
+    });
+    root.querySelectorAll('input[data-mb], textarea[data-mb], select[data-mb]').forEach(function (el) {
+      el.addEventListener('change', function () { fire(el); });
+    });
+    root.querySelectorAll('[data-mb-enter]').forEach(function (el) {
+      el.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        var btn = document.querySelector(el.dataset.mbEnter);
+        if (btn) btn.click();
+      });
+    });
+    // 表格里的折叠块：切换被折叠的行。
+    // 注意：这里【不能】用 hidden / display:none 去藏行——被藏起来的行不再占位，
+    // 跨行的 rowspan 就会把后面的行整片挤歪。做法是让行留在表格里，只换一个类名
+    // （.mb-fold-off，由 CSS 把那一行的内容与内边距收掉）。
+    root.querySelectorAll('.mb-fold-state[data-mb-rows]').forEach(function (el) {
+      var rows = document.querySelectorAll('[data-mb-fold="' + el.id + '"]');
+      function apply() {
+        rows.forEach(function (r) {
+          r.classList.toggle('mb-fold-off', !el.checked);
+          r.removeAttribute('hidden');
+        });
+      }
+      apply();
+      el.addEventListener('change', apply);
+    });
+    // 图片 / 视频 / 音频：编译出来的是 <img src alt data-mb-media="…">，
+    // 这里按文件内容判断它到底是图片、视频还是音频（音频还要抠内嵌封面）
+    if (root.querySelectorAll) {
+      root.querySelectorAll('img[data-mb-media]').forEach(resolveMedia);
+    }
+    // trigger 排在后面、call / use 先跑到的情况：这里补跑一次
+    PENDING.splice(0).forEach(function (p) {
+      var rec = TRIGGERS[p.flag];
+      if (!rec) { LOG('补跑失败：trigger「' + p.flag + '」始终没出现'); return; }
+      var at2 = (p.name === 'call' && rec.anchor && rec.anchor.parentNode) ? rec.anchor : p.anchor;
+      LOG('补跑 ' + p.name + '：' + p.flag);
+      runUnits(rec.units, at2, p.scope);
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { init(); });
+  } else { init(); }
+  window.mb = { init: init, evaluate: evaluate, run: runScript, vars: GLOBAL,
+                log: MB_LOG, triggers: TRIGGERS, media: resolveMedia };
+})();
+</script>
+</body>
+</html>
