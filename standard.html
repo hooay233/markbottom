@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MarkBottom 0.1 版本标准</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css" crossorigin="anonymous">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js" crossorigin="anonymous"></script>
 <style>
 /* ===== 1. 必要的样式定义 ===== */
 .mb-ruby-under { ruby-position: under; }
@@ -35,6 +37,14 @@
 .mb-float-right { float: right; clear: right; margin: 0 0 0.5em 0.5em; }
 .mb-float-left  { float: left;  clear: left;  margin: 0 0.5em 0.5em 0; }
 .mb-inline-middle { display: inline-block; vertical-align: middle; }
+
+/* 排版调整语句的浮动 / 占位容器：容器有明确高度时，里面的图片（视频）按容器高度缩，
+   否则图片比容器高就会溢出到容器外面、压住下面的正文（浏览器不会为溢出的部分让路） */
+.mb-float-right img, .mb-float-left img, .mb-block img, .mb-inline-middle img,
+.mb-float-right video, .mb-float-left video, .mb-block video, .mb-inline-middle video { max-height: 100%; }
+/* 容器里若还留着一层 <p>，把它撑满容器——height 的百分比才有参照 */
+.mb-float-right > p, .mb-float-left > p,
+.mb-block > p, .mb-inline-middle > p { margin: 0; height: 100%; }
 
 .mb-vertical   { writing-mode: vertical-rl; display: inline-block; vertical-align: top; }
 .mb-horizontal { writing-mode: horizontal-tb; }
@@ -122,10 +132,23 @@ tr.mb-fold-off > th, tr.mb-fold-off > td {
 tr.mb-fold-off > th > *, tr.mb-fold-off > td > * { display: none; }
 
 /* ===== 媒体（图片 / 视频 / 音频） ===== */
-.mb-media, .mb-media-cover > img { max-width: 100%; }
+/* 尺寸上限：宽 ≤ min(100%,90vw)（不超过栏宽，同时不超过视口的90%）、高 ≤75vh。
+   这里用【元素选择器】是故意的：它比浮动 / 占位容器里那条（max-height:100%）更弱，
+   所以容器里的元素仍然先按容器高度缩 */
+img, video, audio { max-width: min(100%,90vw); max-height:75vh; }
 .mb-media-cover { display: inline-block; }
 .mb-media-cover > img { display: block; margin-bottom: 0.3em; }
-body.mb-doc video, body.mb-doc audio { max-width: 100%; }
+
+/* 媒体的最大高度：min(0.75×视口高, 0.8×视口宽)——上限见下一条那个元素规则（C.27 改成：宽 ≤ min(100%, 90vw)、高 ≤ 75vh）
+   这条比浮动 / 占位容器里那条（max-height:100%）更宽松，所以容器里的元素仍按容器高度缩 */
+/* 旧的 min(75vh, 80vw) 上限已并到上面那条（C.27） */
+
+/* ===== LaTeX 公式 ===== */
+.mb-math { font-family: "SF Mono", Consolas, "Noto Sans Mono CJK SC", monospace; }
+.mb-math-block {
+    display: block; margin: 0.8em 0; text-align: center;
+    font-family: "SF Mono", Consolas, "Noto Sans Mono CJK SC", monospace;
+}
 
 /* ===== 文档基础排版 ===== */
 body.mb-doc {
@@ -152,7 +175,8 @@ body.mb-doc table { border-collapse: collapse; margin: 1em 0;
                     display: block; overflow-x: auto; max-width: 100%; }
 body.mb-doc th, body.mb-doc td { border: 1px solid #d0d7de; padding: .35em .6em; vertical-align: top; }
 body.mb-doc thead th, body.mb-doc th[scope=row] { background: #f2f3f5; }
-body.mb-doc img { max-width: 100%; }
+/* 图片 / 视频 / 音频的尺寸上限统一放在上面的「媒体」一节
+   （那一条的选择器更弱，浮动 / 占位容器里那条 max-height: 100% 才能压过它） */
 body.mb-doc dl { margin: 1em 0; }
 body.mb-doc dt { font-weight: 600; }
 body.mb-doc dd { margin: 0 0 .4em 1.5em; }
@@ -174,7 +198,7 @@ body.mb-doc .mb-exec:empty + br { display: none; }
 <h2>0. 阅读约定</h2>
 <ol>
 <li>本文档中<strong>所有的 <code>markbottom</code> 代码块都是“输入”，紧跟在它后面的 <code>html</code> 代码块是它“应当生成的 HTML”</strong>。表格里的 <code>mbmd</code> / <code>html</code> 两列含义相同。</li>
-<li>除少数必须依赖脚本的交互功能（按钮、输入框、选择框、功能语句等）外，其余语法都<strong>只依赖 HTML + CSS</strong> 即可正确渲染。</li>
+<li>除少数必须依赖脚本的功能（按钮、输入框、选择框、功能语句、<strong>媒体类型判断</strong>、<strong>公式渲染</strong>等）外，其余语法都<strong>只依赖 HTML + CSS</strong> 即可正确渲染。（这些功能在没有脚本时也要有可读的退路：媒体按图片输出、公式按原文显示。）</li>
 <li>交互功能的 mb 源码被<strong>原样</strong>写进 <code>data-mb</code> 属性，由运行时读取执行（参考实现见<a href="#附录-a参考实现-mbjs">附录 A</a>）。这只是<strong>一种</strong>实现约定，不属于标准的一部分。</li>
 <li>只要不产生歧义，定界符都允许使用对应的全角写法：<code>|</code>↔<code>｜</code>、<code>/</code>↔<code>／</code>`↔<code>＼</code>。ruby 的 <code>【】</code> 可写作半角 <code>[()]</code>。</li>
 <li>所有成对定界符都支持嵌套，按“<strong>就近配对</strong>”匹配，内层先解析。</li>
@@ -249,6 +273,14 @@ body.mb-doc .mb-exec:empty + br { display: none; }
 .mb-float-right    { float: right;  clear: right; margin: 0 0 0.5em 0.5em; }
 .mb-float-left     { float: left;   clear: left;  margin: 0 0 0.5em 0.5em 0; }
 .mb-inline-middle  { display: inline-block; vertical-align: middle; }
+
+/* 排版调整语句的浮动 / 占位容器：容器有明确高度时，里面的图片（视频）按容器高度缩，
+   否则图片比容器高就会溢出到容器外面、压住下面的正文（浏览器不会为溢出的部分让路） */
+.mb-float-right img, .mb-float-left img, .mb-block img, .mb-inline-middle img,
+.mb-float-right video, .mb-float-left video, .mb-block video, .mb-inline-middle video { max-height: 100%; }
+/* 容器里若还留着一层 &lt;p&gt;，把它撑满容器——height 的百分比才有参照 */
+.mb-float-right &gt; p, .mb-float-left &gt; p,
+.mb-block &gt; p, .mb-inline-middle &gt; p { margin: 0; height: 100%; }
 
 /* —— 竖排文本 —— */
 .mb-vertical   { writing-mode: vertical-rl; display: inline-block; vertical-align: top; }
@@ -384,9 +416,21 @@ tr.mb-fold-off &gt; td &gt; * { display: none; }
 .mb-chart-pie { width: 8em; height: 8em; }
 
 /* —— 图片 / 视频 / 音频（见 3.21） —— */
-.mb-media, .mb-media-cover &gt; img { max-width: 100%; }
+/* 尺寸上限：宽 ≤ min(100%, 90vw)（不超过栏宽，同时不超过视口的 90%）、高 ≤ 75vh。
+   这里用【元素选择器】是故意的：它比浮动 / 占位容器里那条（max-height: 100%）更弱，
+   所以容器里的元素仍然先按容器高度缩 */
+img, video, audio { max-width: min(100%, 90vw); max-height: 75vh; }
 .mb-media-cover { display: inline-block; }
-.mb-media-cover &gt; img { display: block; margin-bottom: 0.3em; }</code></pre>
+.mb-media-cover &gt; img { display: block; margin-bottom: 0.3em; }
+
+/* 旧的上限 min(75vh, 80vw) 已并到上面那条（C.27） */
+
+/* —— LaTeX 公式（见 3.23） —— */
+.mb-math { font-family: &quot;SF Mono&quot;, Consolas, &quot;Noto Sans Mono CJK SC&quot;, monospace; }
+.mb-math-block {
+    display: block; margin: 0.8em 0; text-align: center;
+    font-family: &quot;SF Mono&quot;, Consolas, &quot;Noto Sans Mono CJK SC&quot;, monospace;
+}</code></pre>
 <h3>1.2 可选的观感样式（不影响正确性）</h3>
 <p>下面这些类名只是让控件更好看；什么都不写也能正确工作。（另外：<strong>表格宽度超出屏幕时应当能左右滑动</strong>，例如给表格加 <code>display: block; overflow-x: auto; max-width: 100%</code>。）</p>
 
@@ -461,8 +505,11 @@ tr.mb-fold-off &gt; td &gt; * { display: none; }
 <tr><td><code>[|[竖排文本]|]</code></td></tr>
 <tr><th rowspan="2" scope="row">竖排中的横排文本</th><td><code>「「横排文本『『in』』竖排文本」」</code></td><td rowspan="2"><code>&lt;span class=&quot;mb-vertical&quot;&gt;横排文本&lt;span class=&quot;mb-horizontal&quot;&gt;in&lt;/span&gt;竖排文本&lt;/span&gt;</code></td></tr>
 <tr><td><code>[|[横排文本[-[in]-]竖排文本]|]</code></td></tr>
-<tr><th scope="row">图片 / 视频 / 音频</th><td><code>![替代文本](地址)((描述))</code></td><td><code>&lt;img src=&quot;地址&quot; alt=&quot;替代文本&quot; aria-label=&quot;描述&quot;&gt;</code>（视频 / 音频换成 <code>&lt;video&gt;</code> / <code>&lt;audio&gt;</code>）</td></tr>
 </tbody></table>
+
+<p>| 图片 / 视频 / 音频 || <code>![替代文本](地址)((描述))</code> | <code>&lt;img src=&quot;地址&quot; alt=&quot;替代文本&quot; aria-label=&quot;描述&quot;&gt;</code>（视频 / 音频换成 <code>&lt;video&gt;</code> / <code>&lt;audio&gt;</code>） |
+| 无障碍标签 || <code>**注意**((提示文本))</code> | <code>&lt;strong aria-label=&quot;提示文本&quot;&gt;注意&lt;/strong&gt;</code> |
+| LaTeX 公式 || <code>$行内$</code> 与 <code>$$$行间$$$</code> | <code>&lt;span class=&quot;mb-math&quot; data-mb-tex=&quot;行内&quot;&gt;行内&lt;/span&gt;</code> |</p>
 
 <p><em>此外 mb 还对表格功能进行了扩展</em></p>
 
@@ -531,7 +578,7 @@ tr.mb-fold-off &gt; td &gt; * { display: none; }
 同时mb应该要自动添加<code>&lt;rp&gt;</code>标签来保证不支持ruby的设备显示出来不影响阅读</p>
 
 <p>当没有输入 ruby text 时
-默认将给予每个字符标上“●”，可作为着重符合：</p>
+默认将给予每个字符标上“●”，可作为着重符合——<strong>但分隔符本身不能省</strong>：只有写了 <code>|</code>（或 <code>/</code>）而后面留空时，才算着重号；写成 <code>【内容】</code>（完全没有 <code>|</code> / <code>/</code>）<strong>不是 ruby</strong>，按普通文本原样输出（<code>【</code> <code>】</code> 照原样显示，里面的内容照常解析）。</p>
 
 <pre><code class="language-markbottom">在日本，横排时着重点【一般标在上方|】。而中国则【一般标在下方/】</code></pre>
 <p>并且ruby可以嵌套：</p>
@@ -563,7 +610,7 @@ tr.mb-fold-off &gt; td &gt; * { display: none; }
 </blockquote>
 
 <h4>着重号</h4>
-<p>当 <code>|</code> 或 <code>/</code> 后面为空时，应当给<strong>每一个字符</strong>都标一个 <code>●</code>。注意两点：</p>
+<p>当 <code>|</code> 或 <code>/</code> 后面为空时，应当给<strong>每一个字符</strong>都标一个 <code>●</code>（<strong>分隔符不能省</strong>：<code>【内容】</code> 是普通文本，不会有着重号）。注意两点：</p>
 
 <ol>
 <li>必须拆成多个“base+rt”组，否则多个 <code>&lt;rt&gt;</code> 会被并排放在整串文字的中间；</li>
@@ -584,7 +631,7 @@ tr.mb-fold-off &gt; td &gt; * { display: none; }
 <ol>
 <li><code>【】</code> 之间的第一段是基字，第一段之后被 <code>|</code> 分开的是上标，被 <code>/</code> 分开的是下标。</li>
 <li>基字中若还含有 <code>【】</code>，按“就近配对”先解析内层。</li>
-<li>基字为空时<strong>按原样输出</strong>（不报错、不丢弃）；上标/下标同时为空时等价于空 ruby，输出基字本身。</li>
+<li><code>【】</code> 里<strong>没有任何 <code>|</code> / <code>/</code></strong> 时不是 ruby——连同 <code>【</code> <code>】</code> 一起按普通文本输出（C.28 改的）；基字为空时<strong>按原样输出</strong>（不报错、不丢弃）；写了分隔符但两侧都空（<code>【基字|/】</code>）时按着重号处理。</li>
 <li><code>|</code>、<code>/</code>、<code>｜</code>、<code>／</code> 同时出现时以最先出现的那个为分隔语义。</li>
 </ol>
 
@@ -653,8 +700,8 @@ _(Commental)_
 <p><strong>规则</strong></p>
 
 <ol>
-<li>默认颜色由 CSS 变量 <code>--mbhighlightcolor</code> / <code>--mbhighlightbgcolor</code> 提供，便于整站换色与“暗色模式”。</li>
-<li>想要指定具体颜色时，在定界符后紧跟 <code>#rgb</code>／<code>#rrggbb</code>／颜色名，例如 <code>!'#e33'红色'!</code>，实现应当把它写成 <code>style=&quot;--mbhighlightcolor:#e33&quot;</code>（或直接 <code>color</code>）。</li>
+<li>颜色由 CSS 变量 <code>--mbhighlightcolor</code> / <code>--mbhighlightbgcolor</code> 提供，便于整站换色与“暗色模式”。</li>
+<li><strong>语法层面不支持指定颜色</strong>（这条功能已在 C.22 取消）：定界符里的内容一律按<strong>原样文字</strong>处理，<code>!'#e33'红色'!</code> 里的 <code>#e33</code> 就是普通文字。要单独改某一处的颜色，用命名语句给它取名字（<code>!'红色'!{.warn}</code>），再在 CSS 里写 <code>.warn { --mbhighlightcolor: #e33; }</code>。</li>
 <li>五种定界符可以嵌套，颜色以最内层为准。</li>
 </ol>
 
@@ -853,6 +900,7 @@ _(Commental)_
 <li><code>trigger</code>，<code>trigger:&quot;flag&quot;</code>：把<strong>同一组里它后面的那些功能语句</strong>记在 <code>flag</code> 名下，<strong>先不执行</strong></li>
 <li><code>call</code>，<code>call:&quot;flag&quot;</code>：在<strong>原来 trigger 的位置</strong>执行 <code>flag</code> 名下那串语句（如 <code>put</code> 的结果就出现在原处）</li>
 <li><code>use</code>，<code>use:&quot;flag&quot;</code>：在 <strong>use 语句所在的位置</strong>执行 <code>flag</code> 名下那串语句</li>
+<li><code>quote</code>，<code>quote:&quot;地址[范围]&quot;</code>：引用<strong>其他 mbmd 文件的内容</strong>，插在该语句的位置（见 <a href="#324-引用其他文件quote">3.24</a>）</li>
 </ul>
 
 <p>单独成行时：</p>
@@ -910,7 +958,7 @@ _(Commental)_
 &lt;/div&gt;</code></pre>
 <p>放在行尾时，它修改<strong>本行所属的块</strong>：</p>
 
-<pre><code class="language-markbottom">这一行右对齐{|---:|}</code></pre>
+<pre><code class="language-markbottom">这一行右对齐{|:---:|}</code></pre>
 <pre><code class="language-html">&lt;p class=&quot;mb-right&quot;&gt;这一行右对齐&lt;/p&gt;</code></pre>
 <p>放在表格单元格末尾时，它修改<strong>该单元格</strong>：</p>
 
@@ -946,6 +994,9 @@ _(Commental)_
 <li><code>===</code> 与 <code>-…-</code> 互斥；同时出现时以 <code>===</code> 为准。</li>
 <li>“行数”是浮点数，编译成 <code>style=&quot;height: &lt;n&gt;em&quot;</code>（约等于行高的倍数）。</li>
 <li><code>===</code> 表示元素独占一行——这本来就是 md 里图片的默认显示策略，所以对图片来说 <code>{|===|}</code> 相当于显式声明，主要用途是把<strong>行内</strong>的元素恢复成块级。</li>
+<li>浮动 / 占位容器有明确高度时（<code>{|--.5|}</code> → <code>height: 5em</code>），里面的<strong>元素应当按容器高度缩放</strong>（图片用 <code>max-height: 100%</code>）——否则图片比容器高就会<strong>溢出到容器外面、压住下面的正文</strong>（浏览器不会为溢出的部分让路）；容器里若只有一个元素（例如一张图），编译时<strong>不要</strong>再套一层 <code>&lt;p&gt;</code>（与上面的示例一致），这样元素直接以容器为参照。容器本身也带同一个高度上限（<code>{|--.40|}</code> 这种很大的行数不会真的超过 <code>75vh</code>，见 <a href="#321-图片--视频--音频">3.21</a> 规则 11）。</li>
+<li>排版调整语句写在<strong>元素所在那一行的末尾</strong>（<code>![图](…) {|--.5|}</code>）与<strong>单独成行</strong>（写在元素上方）<strong>完全等价</strong>，都要编译成同一个容器——只把类加到那一段的 <code>&lt;p&gt;</code> 上是不行的：那样容器没有 <code>height</code>，里面的元素缩不下去。</li>
+<li>「行数」只对<strong>元素</strong>（图片这类有固定尺寸的东西）有意义：普通文字段落的高度由文字自己决定，给它套 <code>height</code> 反而会让文字溢出容器。</li>
 </ol>
 
 <h4>3.9.5 解析语句</h4>
@@ -971,27 +1022,31 @@ _(Commental)_
 <table>
 <thead><tr><th>类型</th><th>含义</th></tr></thead>
 <tbody>
-<tr><td><code>表</code></td><td>表格</td></tr>
-<tr><td><code>柱</code></td><td>柱状图</td></tr>
-<tr><td><code>折</code></td><td>折线图</td></tr>
-<tr><td><code>饼</code></td><td>饼图（环形）</td></tr>
+<tr><td><code>table</code></td><td>表格</td></tr>
+<tr><td><code>bar</code></td><td>柱状图</td></tr>
+<tr><td><code>line</code></td><td>折线图</td></tr>
+<tr><td><code>pie</code></td><td>饼图（环形）</td></tr>
 </tbody></table>
+
+<blockquote>
+<p>类型名用<strong>英文</strong>（C.22 改的；旧的汉语类型名 <code>柱</code> <code>折</code> <code>饼</code> <code>表</code> 已在 C.23 <strong>去掉</strong>）；名字区分大小写，写成别的按普通文字原样输出。</p>
+</blockquote>
 
 <p>数据用逗号分隔；表格用 <code>;</code> 分行、<code>,</code> 分列。</p>
 
-<pre><code class="language-markbottom">{[柱:3,5,2,8]}</code></pre>
+<pre><code class="language-markbottom">{[bar:3,5,2,8]}</code></pre>
 <pre><code class="language-html">&lt;figure class=&quot;mb-chart mb-chart-bar&quot; style=&quot;--mb-max:8&quot; role=&quot;img&quot; aria-label=&quot;柱状图&quot;&gt;
   &lt;div class=&quot;mb-bar&quot; style=&quot;--mb-v:3&quot;&gt;&lt;span&gt;3&lt;/span&gt;&lt;/div&gt;
   &lt;div class=&quot;mb-bar&quot; style=&quot;--mb-v:5&quot;&gt;&lt;span&gt;5&lt;/span&gt;&lt;/div&gt;
   &lt;div class=&quot;mb-bar&quot; style=&quot;--mb-v:2&quot;&gt;&lt;span&gt;2&lt;/span&gt;&lt;/div&gt;
   &lt;div class=&quot;mb-bar&quot; style=&quot;--mb-v:8&quot;&gt;&lt;span&gt;8&lt;/span&gt;&lt;/div&gt;
 &lt;/figure&gt;</code></pre>
-<pre><code class="language-markbottom">{[折:1,4,2,8]}</code></pre>
+<pre><code class="language-markbottom">{[line:1,4,2,8]}</code></pre>
 <pre><code class="language-html">&lt;svg class=&quot;mb-chart&quot; viewBox=&quot;0 0 100 40&quot; preserveAspectRatio=&quot;none&quot; role=&quot;img&quot; aria-label=&quot;折线图&quot;&gt;
   &lt;polyline fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1&quot; vector-effect=&quot;non-scaling-stroke&quot;
             points=&quot;0,40 33.3,20 66.7,30 100,0&quot;&gt;&lt;/polyline&gt;
 &lt;/svg&gt;</code></pre>
-<pre><code class="language-markbottom">{[饼:30,20,50]}</code></pre>
+<pre><code class="language-markbottom">{[pie:30,20,50]}</code></pre>
 <pre><code class="language-html">&lt;svg class=&quot;mb-chart mb-chart-pie&quot; viewBox=&quot;0 0 42 42&quot; role=&quot;img&quot; aria-label=&quot;饼图&quot;&gt;
   &lt;circle cx=&quot;21&quot; cy=&quot;21&quot; r=&quot;15.9155&quot; fill=&quot;none&quot; stroke=&quot;#4e79a7&quot; stroke-width=&quot;10&quot;
           stroke-dasharray=&quot;30 70&quot; stroke-dashoffset=&quot;25&quot;&gt;&lt;/circle&gt;
@@ -1000,14 +1055,14 @@ _(Commental)_
   &lt;circle cx=&quot;21&quot; cy=&quot;21&quot; r=&quot;15.9155&quot; fill=&quot;none&quot; stroke=&quot;#e15759&quot; stroke-width=&quot;10&quot;
           stroke-dasharray=&quot;50 50&quot; stroke-dashoffset=&quot;-25&quot;&gt;&lt;/circle&gt;
 &lt;/svg&gt;</code></pre>
-<pre><code class="language-markbottom">{[表:姓名,年龄;小明,12;小红,11]}</code></pre>
+<pre><code class="language-markbottom">{[table:姓名,年龄;小明,12;小红,11]}</code></pre>
 <pre><code class="language-html">&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;姓名&lt;/th&gt;&lt;th&gt;年龄&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
 &lt;tbody&gt;&lt;tr&gt;&lt;td&gt;小明&lt;/td&gt;&lt;td&gt;12&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;小红&lt;/td&gt;&lt;td&gt;11&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;</code></pre>
 <p><strong>规则</strong></p>
 
 <ol>
-<li><code>参数</code> 可省略；可选参数用 <code>;</code> 追加，如 <code>{[饼:30,20,50;标题=占比]}</code>。</li>
-<li>数据也允许写成变量/表达式：<code>{[柱:$a,$b,$c]}</code>。</li>
+<li><code>参数</code> 可省略；可选参数用 <code>;</code> 追加，如 <code>{[pie:30,20,50;标题=占比]}</code>。</li>
+<li>数据也允许写成变量/表达式：<code>{[bar:$a,$b,$c]}</code>。</li>
 <li>图表必须带上 <code>role=&quot;img&quot;</code> 与一段文字 <code>aria-label</code>，保证无障碍。</li>
 <li>折线图/饼图用 <code>&lt;svg&gt;</code>，柱状图允许用纯 CSS 实现。</li>
 </ol>
@@ -1125,7 +1180,7 @@ _(Commental)_
 <p><strong>规则</strong></p>
 
 <ol>
-<li>变量名区分大小写：<code>$timeh$</code>（小写 h）是小时，<code>$timeY$</code>（大写 Y）是年份。</li>
+<li>变量名区分大小写：<code>$timeh$</code>（小写 h）是小时，<code>$timeY$</code>（大写 Y）是年份；变量名必须是<strong>合法标识符</strong>（字母 / 下划线开头，只含字母、数字、下划线）——不是的话，<code>$…$</code> 按 LaTeX 公式处理（见 <a href="#323-latex-公式">3.23</a>）。</li>
 <li>未定义的变量返回<strong>空串</strong>，不报错。</li>
 <li>变量与 <code>put:</code> 等连用时，如果同一文档里出现过多次，取<strong>最近一次被赋值</strong>的值；全局变量在整个文档中共享。</li>
 <li><code>$cntnt$</code> 只在触发器内部有值：
@@ -1134,7 +1189,7 @@ _(Commental)_
 <li>输入框 / 多行输入框 / 选择框 → 控件的当前值。</li>
 </ul>
 </li>
-<li><code>$ $</code> 内部不允许出现空格；需要显示一个真正的 <code>$</code> 时用 <code>\$</code>。</li>
+<li>变量名内部<strong>不允许出现空格</strong>——有空格就不是变量、而是公式（<code>$ x $</code>，见 <a href="#323-latex-公式">3.23</a>）；需要显示一个真正的 <code>$</code> 时用 <code>\$</code>。</li>
 <li>时间类变量（<code>$timeh$</code> … <code>$timeD$</code>）<strong>在每次被调用时自动刷新</strong>，取的是调用那一刻的值，而不是页面加载时的值。</li>
 </ol>
 
@@ -1265,9 +1320,12 @@ _(Commental)_
 <li>转义符<strong>优先级最高</strong>：<code>\X</code> 总是先被识别，<code>X</code> 之后不再做任何 mb / md 解析。</li>
 <li>一个 <code>\</code> 只作用于紧跟其后的<strong>一个</strong>字符。</li>
 <li><code>\n</code> 产生的换行只断行不空行；空行请用普通的空行。</li>
-<li>行尾的 <code>\</code>（后面是换行）表示“把下一行接上来”，不算转义。</li>
+<li>行尾的 <code>\</code>（后面是换行）表示“把下一行<strong>原样接上来</strong>”——不留空格、不留换行，接上之后整段照常解析，也没有换行效果：</li>
 </ol>
 
+<pre><code class="language-markbottom">**a\
+b**</code></pre>
+<pre><code class="language-html">&lt;strong&gt;ab&lt;/strong&gt;</code></pre>
 <hr>
 <h3>3.16 原始文本</h3>
 <pre><code class="language-markbottom">[o[origin         al]o]</code></pre>
@@ -1275,7 +1333,7 @@ _(Commental)_
 <p><strong>规则</strong></p>
 
 <ol>
-<li><code>[o[</code> 与 <code>]o]</code> 之间的内容<strong>不做任何解析</strong>，连续空格、制表符、换行都原样保留。</li>
+<li><code>[o[</code> 与 <code>]o]</code> 之间的内容<strong>不做任何解析</strong>，连续空格、制表符、换行都原样保留；<strong>可以跨行书写</strong>（在源文件里直接换行，<strong>空行也不打断</strong>——收尾靠的是 <code>]o]</code> 本身）。</li>
 <li>内容中要出现 <code>]o]</code> 时，用 <code>{/`=n}</code> 略过 n 次。</li>
 <li>与 md 的“行内代码 <code>`</code>”不同：原始文本<strong>不换字体</strong>、不做等宽处理，只保留空白；需要等宽请用代码。</li>
 </ol>
@@ -1340,7 +1398,7 @@ _(Commental)_
 <li>竖排块是<strong>行内级</strong>元素，可以放在段落、表格单元格和列表项里。</li>
 <li>竖排块内部可以再套竖排块（即恢复成竖排）。</li>
 <li>全角引号 <code>「」『』</code> 作为定界符时，成对出现才生效；单独出现按普通标点处理。</li>
-<li>竖排块里的<strong>换行会另起一列</strong>（编译成 <code>&lt;br&gt;</code>）。因为 <code>writing-mode: vertical-rl</code> 的块方向是从右往左，所以各列默认<strong>从右到左</strong>排列，第一列在最右端。</li>
+<li>竖排块里的<strong>换行会另起一列</strong>（编译成 <code>&lt;br&gt;</code>）。因为 <code>writing-mode: vertical-rl</code> 的块方向是从右往左，所以各列默认<strong>从右到左</strong>排列，第一列在最右端。竖排块<strong>可以跨行书写</strong>——在源文件里直接换行就行，<strong>空行也不打断</strong>（收尾靠的是 <code>]|]</code> / <code>」」</code> 本身）。</li>
 </ol>
 
 <hr>
@@ -1518,6 +1576,7 @@ _(Commental)_
 <li>读取内容时应当<strong>只取需要的字节</strong>（用 <code>Range</code> 请求，或读够就停），不要把整个视频读进内存。</li>
 <li>取不到内容时（跨域、离线、404、本地文件）<strong>按图片输出</strong>，并在日志里说明原因；实现可以再退一步、用 <code>&lt;video preload=&quot;metadata&quot;&gt;</code> 的 <code>loadedmetadata</code> 事件探一次（能读出画面尺寸是视频、只有声音是音频），这一步不需要跨域许可。</li>
 <li>视频 / 音频应当带上<strong>可访问名称</strong>：写成 <code>![替代文本](地址)((描述))</code>（见 <a href="#322-aria-label无障碍标签">3.22</a>）；没有写 <code>((…))</code> 时，用替代文本当 <code>aria-label</code>。</li>
+<li>媒体的<strong>尺寸上限</strong>：宽 ≤ <code>min(100%, 90vw)</code>（不超过所在栏宽，同时不超过视口的 90%）、高 ≤ <code>75vh</code>（不超过视口高度的 75%）。这样不论横图、竖图，都不会把整屏占满。</li>
 </ol>
 
 <hr>
@@ -1541,6 +1600,74 @@ _(Commental)_
 <li><code>((…))</code> 是<strong>可选</strong>的；但对<strong>没有可见文字</strong>的元素（<a href="#321-图片--视频--音频">3.21</a> 的视频 / 音频、<a href="#396-图表生成语句">3.9.6</a> 的图表等）应当带上可访问名称。</li>
 <li>与 <code>_(…)_</code>（注解，见 <a href="#35-灰色--注解--涂黑的隐藏文本">3.5</a>）不同：注解是<strong>显示出来</strong>的可见文字，<code>((…))</code> 只写进属性，<strong>不显示</strong>。</li>
 <li>正文里想原样显示 <code>((</code> 时，用转义符 <code>\(</code>（见 <a href="#315-转义符">3.15</a>）。</li>
+</ol>
+
+<hr>
+<h3>3.23 LaTeX 公式</h3>
+<table>
+<thead><tr><th>写法</th><th>含义</th><th>生成的 HTML</th></tr></thead>
+<tbody>
+<tr><td><code>$公式$</code></td><td>行内公式（不换行）</td><td><code>&lt;span class=&quot;mb-math&quot; data-mb-tex=&quot;公式&quot;&gt;公式&lt;/span&gt;</code></td></tr>
+<tr><td><code>$$$</code> … <code>$$$</code></td><td>行间公式（独占一行、居中，<strong>可以跨行</strong>）</td><td><code>&lt;div class=&quot;mb-math-block&quot; data-mb-tex=&quot;公式&quot; data-mb-display=&quot;1&quot;&gt;公式&lt;/div&gt;</code></td></tr>
+</tbody></table>
+
+<pre><code class="language-markbottom">质能方程 $E = mc^2$ 是这么来的。
+
+$$$
+\int_0^1 x^2\,dx = \frac{1}{3}
+$$$</code></pre>
+<pre><code class="language-html">质能方程 &lt;span class=&quot;mb-math&quot; data-mb-tex=&quot;E = mc^2&quot;&gt;E = mc^2&lt;/span&gt; 是这么来的。
+&lt;div class=&quot;mb-math-block&quot; data-mb-tex=&quot;\int_0^1 x^2\,dx = \frac{1}{3}&quot; data-mb-display=&quot;1&quot;&gt;\int_0^1 x^2\,dx = \frac{1}{3}&lt;/div&gt;</code></pre>
+<p><strong>规则</strong></p>
+
+<ol>
+<li>行内公式是「一个 <code>$</code>」加公式再加「一个 <code>$</code>」；行间公式夹在两对 <code>$$$</code> 之间（<code>$$$</code> 也可以与公式写在同一行，写成一行 <code>$$$公式$$$</code>）。</li>
+<li>与变量的区分：<code>$…$</code> 里的内容<strong>恰好是一个合法变量名</strong>（字母 / 下划线开头，只含字母、数字、下划线）时按<strong>变量</strong>处理（见 <a href="#398-变量">3.9.8</a>），否则按<strong>公式</strong>处理。想强制把一个看起来像变量名的东西当公式时，在内容前后各加一个空格（<code>$ x $</code>）——LaTeX 会忽略这些空格，渲染结果一样。</li>
+<li>公式源码<strong>原样</strong>交给渲染器；<code>\$</code> 会输出一个真正的 <code>$</code>（转义符优先，见 <a href="#315-转义符">3.15</a>）。公式里的 <code>&quot;</code>、<code>&amp;</code>、<code>&lt;</code>、<code>&gt;</code> 在写进 HTML 时按文本转义。</li>
+<li>编译时把公式源码放进 <code>data-mb-tex</code> 属性，等页面加载后由实现渲染；<strong>没加载到渲染器时按原文显示</strong>（公式源码本身就是元素里的可见文字，不会变成空白）。</li>
+<li>行间公式默认居中、独占一行；它中间的空行<strong>属于公式</strong>，不会终止它。</li>
+<li>没写收尾的 <code>$$$</code> 时按普通文字输出（附录 B 第 8 条）。</li>
+<li>参考实现用 <strong>KaTeX</strong>（现成的实现）：只有文档里<strong>有公式</strong>时才引入它的 CSS / JS；渲染失败也不影响页面其它部分。</li>
+</ol>
+
+<hr>
+<h3>3.24 引用其他文件（<code>quote</code>）</h3>
+<p><code>{{quote:&quot;地址[范围]&quot;}}</code> —— 把另一个 mbmd 文件的内容<strong>引到这一处</strong>：</p>
+
+<pre><code class="language-markbottom">{{quote:&quot;snippets/intro.mbmd&quot;}}</code></pre>
+<pre><code class="language-html">&lt;!-- 那个文件的内容会原样插到这里，并且照常解析（标题、表格、列表、功能语句都算） --&gt;</code></pre>
+<p><strong>范围</strong>写在地址后面的方括号里；<strong>不写就是整个文件</strong>。行号从 1 开始，<strong>负数从文件末尾数</strong>（<code>-1</code> 是最后一行）；字符位从 1 开始，负数从行尾数；<strong>两端都是闭区间</strong>（含端点）：</p>
+
+<table>
+<thead><tr><th>写法</th><th>含义</th></tr></thead>
+<tbody>
+<tr><td><code>&quot;intro.mbmd&quot;</code></td><td>整个文件</td></tr>
+<tr><td><code>&quot;intro.mbmd[3:5]&quot;</code></td><td>第 3 行到第 5 行</td></tr>
+<tr><td><code>&quot;intro.mbmd[2:-2]&quot;</code></td><td>第 2 行到<strong>倒数第 2 行</strong></td></tr>
+<tr><td><code>&quot;intro.mbmd[3[2]:5[6]]&quot;</code></td><td>第 3 行第 2 个字符 → 第 5 行第 6 个字符</td></tr>
+<tr><td><code>&quot;intro.mbmd[3[3:10]]&quot;</code></td><td>第 3 行第 3 个字符 → 第 3 行第 10 个字符</td></tr>
+<tr><td><code>&quot;intro.mbmd[#id]&quot;</code></td><td><code>{#id}</code> 写在哪一行，就取那一行</td></tr>
+<tr><td><code>&quot;intro.mbmd[#id[0]]&quot;</code></td><td>同上（偏移 0）</td></tr>
+<tr><td><code>&quot;intro.mbmd[#id[9]]&quot;</code></td><td><code>{#id}</code> 所在行<strong>往后第 9 行</strong></td></tr>
+<tr><td><code>&quot;intro.mbmd[#id[-2]]&quot;</code></td><td><code>{#id}</code> 所在行<strong>往前第 2 行</strong></td></tr>
+<tr><td><code>&quot;intro.mbmd[#id[1:2]]&quot;</code></td><td>从「所在行 + 1」到「所在行 + 2」</td></tr>
+<tr><td><code>&quot;intro.mbmd[#id1[0]:#id2[9]]&quot;</code></td><td>从 <code>#id1</code> 所在行到 <code>#id2</code> 所在行 + 9</td></tr>
+<tr><td><code>&quot;intro.mbmd[#id[1[2]:3[4]]]&quot;</code></td><td>「所在行 + 1」的第 2 个字符 →「所在行 + 3」的第 4 个字符</td></tr>
+<tr><td><code>&quot;intro.mbmd[#id[1[2:9]]]&quot;</code></td><td>「所在行 + 1」的第 2 个字符 → 第 9 个字符</td></tr>
+<tr><td><code>&quot;intro.mbmd[#id1[1[2]]:#id2[3[4]]]&quot;</code></td><td><code>#id1</code>「所在行 + 1」的第 2 个字符 → <code>#id2</code>「所在行 + 3」的第 4 个字符</td></tr>
+</tbody></table>
+
+<p><strong>规则</strong></p>
+
+<ol>
+<li>地址是<strong>字符串</strong>（用 <code>&quot;</code> 包起来），里面写 URL 或相对路径；范围紧跟在地址后面的 <code>[</code> <code>]</code> 里（方括号<strong>只写一个</strong>，范围的两端用 <code>:</code> 分开）。</li>
+<li><code>#id</code> 指的是那个文件里写了 <code>{#id}</code> 的<strong>那一行</strong>（命名语句写在元素后面，所以它就是元素所在的行）；<strong>偏移量</strong>是相对这一行的行数（<code>0</code> = 这一行本身，<code>9</code> = 往后 9 行，<code>-2</code> = 往前 2 行）。找不到这个 id 时，这一处引用<strong>留空</strong>并给出一条提示。</li>
+<li>取多行时：<strong>第一行从起始位置到行尾</strong>，<strong>中间各行整行</strong>，<strong>最后一行从行首到结束位置</strong>；同一行内取字符时就是普通的下标切片。</li>
+<li>引用的内容插在<strong>该语句的位置</strong>，并且<strong>照常解析</strong>——等价于把那段文字直接写在文档里。</li>
+<li><strong>只有单独成行、且这一行只有这一条 <code>quote</code> 语句</strong>时才在<strong>编译期</strong>取回来（这样它和文档其它部分完全一样）；写在<strong>按钮 / 输入框 / 触发器里</strong>，或者和别的语句写在同一组时，留给<strong>运行时</strong>执行——运行时用<strong>同一个编译器</strong>把引用来的内容整段解析成 HTML 再插进来，所以标题、引用、竖排、原始文本、表格、列表、折叠块、按钮、输入框、图表、脚注、checkbox、LaTeX 公式以及各种功能语句<strong>全都会照常解析</strong>（插进来的那一片会紧接着接上运行时，所以里面的功能语句、媒体、公式也会当场生效）。两者的区别只是<strong>时机</strong>：编译期那条路在文档加载前就完成，运行时那条路要等内容取回来才出现。</li>
+<li>取不到内容时（跨域、离线、404、路径不对），这一处<strong>保留原语句</strong>并在日志里说明原因，不影响文档其它部分。</li>
+<li>被引用进来的内容里若也有 <code>quote</code> 语句，<strong>不会在编译期再展开</strong>（避免递归）；它只会由运行时按行内方式处理。</li>
+<li>与媒体（<a href="#321-图片--视频--音频">3.21</a>）一样，这一步要读网络内容，所以需要能跨域读取。</li>
 </ol>
 
 <hr>
@@ -1910,7 +2037,7 @@ _(Commental)_
 <li><strong>块级先于行内</strong>：折叠块、代码块、表格、原始文本等块级构造先切分，再对每一块做行内解析。</li>
 <li><strong>mb 优先于 md</strong>：当同一位置既能匹配 md 又能匹配 mb 时，取 mb。例如 <code>_[a]_</code> 是下标、<code>_(a)_</code> 是注解（都不是斜体），<code>_a_</code> 是下划线（斜体一律用 <code>*a*</code>）；<code>~[a][b]</code> 是折叠块而不是 md 的删除线。</li>
 <li><strong>长定界符优先</strong>：<code>-&gt;[...]&lt;-</code> 优先于 <code>-[...]-</code>，<code>[-[...]-]</code> 优先于 <code>-[...]-</code>，<code>[|[…]|]</code> 和 <code>[[…]]</code> 优先于 <code>[</code>，<code>+:</code> <code>-:</code> <code>%:</code> <code>&gt;:</code> 优先于 <code>+</code> <code>-</code> <code>%</code> <code>&gt;</code>，<code>.-</code> <code>.+</code> <code>.?</code> 优先于单独的 <code>.</code>。</li>
-<li><strong>不可跨空行</strong>：所有行内语法（ruby、变大、上色、转义符……）不得跨越空行，跨空行时按未闭合处理，原样输出。</li>
+<li><strong>不可跨空行</strong>：所有行内语法（ruby、变大、上色、转义符……）不得跨越空行，跨空行时按未闭合处理，原样输出。<strong>例外</strong>：竖排文本（<code>[|[ ]|]</code> / <code>「「」」</code>）、原始文本（<code>[o[ ]o]</code>）与行间公式（<code>$$$</code> … <code>$$$</code>）<strong>可以跨行、也可以跨空行</strong>——它们的收尾靠的是明确的结束标识，而不是“这一行完了”（见 <a href="#316-原始文本">3.16</a>、<a href="#319-竖排文本">3.19</a>、<a href="#323-latex-公式">3.23</a>）。</li>
 <li><strong>未闭合即原样输出</strong>：任何未配对的定界符都按普通文本输出，不得吞掉后续内容。</li>
 <li><strong>输出必须转义</strong>：所有来自文档内容的文本在写入 HTML 时都要转义 <code>&amp; &lt; &gt;</code>；只有实现明确支持的属性（如 <code>data-mb</code>）才做属性值转义。</li>
 <li><strong>空白</strong>：定界符与内容之间的<strong>首尾各一个空格</strong>不参与内容（<code>【 汉字 | han 】</code> 等价于 <code>【汉字|han】</code>）；内容中间的空格全部保留。</li>
@@ -1919,7 +2046,386 @@ _(Commental)_
 </ol>
 
 <hr>
+<h2>附录 C：修订记录</h2>
+<h3>C.1 第 2 稿</h3>
+<table>
+<thead><tr><th>#</th><th>第 1 稿的推断</th><th>结论</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>计算语句与解析语句的定界符会冲突</td><td><strong>不冲突</strong>：计算语句必须以「<code>{</code> + 反引号」开始、以「反引号 + <code>}</code>」结束（见 3.9.7）；解析语句以 <code>{/</code> 开始、<code>}</code> 结束（见 3.9.5）</td></tr>
+<tr><td>2</td><td>图表生成语句 <code>{[ ]}</code> 的类型与数据格式</td><td>采纳本文档的设计（见 3.9.6）</td></tr>
+<tr><td>3</td><td>标签 <code>::Label</code> 是“锚点 + 小标签”</td><td><strong>错</strong>：它就是 HTML <code>&lt;label&gt;</code> 的作用——把文字与表单控件绑定（见 3.14）</td></tr>
+<tr><td>4</td><td>原始转义符 <code>\o!</code> 作用于其后一整段</td><td><strong>错</strong>：<code>\o</code> 只使<strong>紧跟其后的一个字符</strong>不被解析（见 3.17）</td></tr>
+<tr><td>5</td><td><code>%: &gt;:</code> 的写法</td><td>采纳本文档的解释：一对运算符 <code>s %: a &gt;: b</code>（见 3.9.7）</td></tr>
+<tr><td>6</td><td>运算符表里 <code>&gt;=</code> 重复出现</td><td>原文笔误，第二个应为 <code>&lt;=</code></td></tr>
+<tr><td>7</td><td><code>-&gt;(#id)</code> 是“由 #id 元素触发本控件”</td><td><strong>错</strong>：它是<strong>回车键所对应的那个按钮</strong>（见 3.11）</td></tr>
+</tbody></table>
+
+<h3>C.2 第 3 稿</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>结论</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>排版调整语句里 <code>-</code> 写在 <code>.</code> 前 / 后分别是什么意思</td><td>采纳本文档的“哪一侧有文字环绕”；另外 <code>===</code> 表示元素单独独占一行（md 里图片的默认策略就是这个）</td></tr>
+<tr><td>2</td><td>解析语句 <code>{/</code> 与 <code>}</code> 之间的参数</td><td>采纳：反引号代表被略过的结束标识，数字是略过次数</td></tr>
+<tr><td>3</td><td>标签的绑定方式</td><td><strong>改为自动绑定</strong>：<code>::user name: :[input your name]()</code>——标签后面放一个可交互元素就自动绑上（见 3.14）</td></tr>
+<tr><td>4</td><td>新增类名里哪些是必需的</td><td>已分成 <a href="#11-01-版新增语法所需的样式必需">1.1 必需</a> 与 <a href="#12-可选的观感样式不影响正确性">1.2 可选观感</a> 两组；<code>.mb-emoji</code> / <code>.mb-icon</code> / <code>.mb-var</code> 已从正文删除</td></tr>
+<tr><td>5</td><td>时间变量是否实时刷新</td><td><strong>在调用时自动刷新</strong>（见 3.9.8 与附录 A 的 <code>tick()</code>）</td></tr>
+<tr><td>6</td><td>图表数据能否来自变量</td><td>能，通过变量传入（<code>{[柱:$a,$b,$c]}</code>）</td></tr>
+<tr><td>7</td><td>折叠块第三形式的 <code>id</code> 编号规则</td><td>采纳</td></tr>
+<tr><td>8</td><td><code>\o!</code> 的示例</td><td>已把示例文本换成 <code>\o!\o[这不是一个链接](example.com)</code> → <code>![这不是一个链接](example.com)</code></td></tr>
+</tbody></table>
+
+<h3>C.3 第 4 稿</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>结论</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><code>::文字:</code> 结尾的 <code>:</code> 能否省略</td><td><strong>可以省略</strong>，<code>::Label</code>、<code>::Label:</code> 等价</td></tr>
+<tr><td>2</td><td>标签怎么决定绑定对象</td><td><strong>向后找第一个可交互元素</strong>，标签文字就是它前面的全部内容</td></tr>
+<tr><td>3</td><td>斜线单元格里多段文本的排列顺序</td><td><strong>从左往右</strong>依次填入：<code>/</code> 型是「左上 → 右下」，<code>\</code> 型是「左下 → 右上」（已同步修正 <code>.mb-slash-d</code> 的定位和 3.20.2 规则 3）</td></tr>
+<tr><td>4</td><td>转义符在各类定界符内部是否一律生效</td><td><strong>是</strong>（见附录 B 第 1 条）</td></tr>
+</tbody></table>
+
+<p>至此 0.1 版的存疑点已全部确认，没有遗留的待确认项。</p>
+
+<h3>C.4 第 5 稿</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>结论</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>表格单元格里的 <code>|</code> 是否需要转义成 <code>\|</code></td><td><strong>不需要</strong>：行内代码段里的 <code>|</code> 原样书写即可。已把全文的 <code>\|</code> 还原成 <code>|</code>，并把第 0 节第 6 条改成“解析表格时先切出行内代码段，再按 <code>|</code> 切分单元格”</td></tr>
+</tbody></table>
+
+<h3>C.5 第 6 稿</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>结论</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>总览表表头的 <code>%</code> 该写在哪一侧</td><td><strong>本稿把原稿改错了</strong>：原稿是 <code>( 语法 \ 示例 \ 格式 )%</code>（<code>%</code> 只在<strong>右侧</strong>），本稿却改成了 <code>%( 语法 \ 示例 \ 格式 )</code>——把 <code>%</code> 挪到了左侧。第 8 稿已改回原稿写法，见 C.7</td></tr>
+</tbody></table>
+
+<h3>C.6 第 7 稿（按本文档的规则自查）</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>3.20.3 的例子里写了 <code>\| 班级 \ 姓名 \|</code>，而 <code>\</code> 是转义符，裸写会被解析成“转义一个空格”</td><td>已改成斜线单元格 <code>%( 班级 \ 姓名 )</code>，并加了一句提醒</td></tr>
+<tr><td>2</td><td>3.4 说上标 / 下标内部不再解析上标 / 下标，与附录 B 第 3 条“内层先解析”冲突</td><td>在附录 B 第 3 条写明这是唯一例外</td></tr>
+<tr><td>3</td><td>3.2 规则 3 写“基字为空时报错”，与附录 B 第 12 条“不得报错丢弃”冲突</td><td>改成“按原样输出”</td></tr>
+<tr><td>4</td><td>3.16 规则 2 里的 <code>[o[…]{/]o]}</code> 是个没意义的例子</td><td>删掉</td></tr>
+<tr><td>5</td><td>3.12 规则 3 把 <code>-&gt;(#id)</code> 用在多行输入框上</td><td>改成“意义不大，实现可忽略或解释成 Ctrl+Enter”</td></tr>
+<tr><td>6</td><td>3.9.4 正文里沿用原稿的 <code>{===:}</code>（两侧少了竖线）</td><td>已统一成 <code>{|===:|}</code></td></tr>
+</tbody></table>
+
+<h3>C.7 第 8 稿</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>结论</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>斜线单元格该汇聚在哪一角</td><td><strong>汇聚在右下角</strong>，<code>%</code> 只写在<strong>右侧</strong>。原稿本来就是 <code>( 语法 \ 示例 \ 格式 )%</code>；第 6 稿把它改成 <code>%( … )</code> 是<strong>把对的改错了</strong>——左侧那个 <code>%</code> 是第 6 稿凭空加上的，原稿里从来只有右侧一个 <code>%</code>。现已改回原稿写法</td></tr>
+<tr><td>2</td><td>三段以上的斜线怎么画</td><td>补充了 <code>.mb-slash-fan</code>（内联 SVG 画附加线）与 <code>.mb-slash-mid</code> 的落点；标准只规定“所有线都过汇聚角”和“文本从左往右依次填入”，具体落点由实现决定</td></tr>
+<tr><td>3</td><td>3.9.4 正文的 <code>{===:}</code></td><td>统一成 <code>{|===:|}</code></td></tr>
+</tbody></table>
+
+<h3>C.9 第 10 稿（按转换器实测反馈修正）</h3>
+<table>
+<thead><tr><th>#</th><th>现象</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>上下同时标注时，<strong>下标被当成了上标</strong></td><td><code>ruby-position</code> 是<strong>继承属性</strong>、且只作用于「注释容器」——写在内层 <code>&lt;rt&gt;</code> 上根本不生效。改成：外层 <code>&lt;ruby&gt;</code> 加 <code>mb-ruby-under</code>，内层 <code>&lt;ruby&gt;</code> 加<strong>新增的</strong> <code>mb-ruby-over</code> 压回上方（见 3.2）</td></tr>
+<tr><td>2</td><td>写作 <code>【这样/】</code> 时<strong>着重号仍标在上方</strong></td><td>补规则：<code>/</code> 型的着重号必须写在 <code>&lt;ruby class=&quot;mb-ruby-under&quot;&gt;</code> 上（见 3.2 着重号节）</td></tr>
+<tr><td>3</td><td><code>!.荧光笔.!</code>、<code>!:前+荧:!</code> 的<strong>下半部分背景色不显示</strong></td><td>原 CSS 里 <code>background-image: var(--mbhighlightbgcolor, …)</code> 是<strong>非法声明</strong>（<code>background-image</code> 不接受颜色，整条会被丢弃）。改成 <code>linear-gradient(色, 色)</code>（见第 1 节）</td></tr>
+<tr><td>4</td><td><code>_下划线_</code> 被当成了斜体</td><td>明确：<code>_文字_</code> 是<strong>下划线</strong>（<code>&lt;u&gt;</code>），<strong>斜体一律用 <code>*文字*</code></strong>（见 3.4 规则 3、附录 B 第 5 条）</td></tr>
+<tr><td>5</td><td>竖排块<strong>不能换行</strong></td><td>补规则：竖排块里的换行另起一列（编译成 <code>&lt;br&gt;</code>）；因 <code>writing-mode: vertical-rl</code> 的块方向从右往左，各列默认<strong>从右到左</strong>（见 3.19 规则 6）</td></tr>
+<tr><td>6</td><td>三段折叠块：标题字号偏小、收起文本前多了 <code>▼</code>、<strong>会打断列表</strong></td><td>① 收起文本<strong>原样显示</strong>、不加装饰符（删掉 <code>▼</code>，<code>font: inherit</code>）；② 三段式的标题与内容都是<strong>行内级</strong>，永远用 <code>&lt;span class=&quot;mb-fold-inline&quot;&gt;</code>，不打断列表（见 3.7 规则 5、6）</td></tr>
+</tbody></table>
+
+<h3>C.10 第 11 稿（新增分离式折叠块）</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>新增<strong>分离式折叠块</strong>：<code>~[标题]~&gt;[标识符]</code> 做按钮，<code>[标识符]~&gt;[内容]</code> 是被折叠的内容</td><td>在 3.7 末尾新增 <code>#### 分离式折叠块</code>，总览表加一行；内容行可以写表格片段 / 列表项，会<strong>并入相邻的表格或列表</strong>，折叠时不打断它们</td></tr>
+<tr><td>2</td><td><strong>移除一般折叠块对列表的折叠</strong></td><td>一般折叠块回归<strong>块级</strong>：删掉了 C.9 加的两条“三段式是行内级、不打断列表”规则，改成「可以放在段落与表格单元格里，<strong>不要用在列表项中间</strong>」；折叠表格行的能力保留（新规则 7）</td></tr>
+<tr><td>3</td><td>三段式重新用块级容器</td><td>第 1.1 节补上 <code>.mb-fold-block</code> 的 CSS 和 <code>[data-mb-fold][hidden]</code></td></tr>
+</tbody></table>
+
+<h3>C.11 第 12 稿（分离式折叠块的正式写法）</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>按钮写成了 <code>~[标题]~&gt;[标识符]</code></td><td>改成 <strong><code>[标题]~&gt;[标识符]</code></strong>（去掉开头的 <code>~</code>）——<strong>这一条后来被 C.13 推翻</strong>：<code>~</code> 不能省</td></tr>
+<tr><td>2</td><td>内容写成了 <code>[标识符]~&gt;内容</code></td><td>改成 <strong><code>[标识符]~&gt;[</code></strong> … <code>]</code>——<code>~&gt;</code> 后面的 <code>[</code> … <code>]</code> 是<strong>必需的</strong>，按方括号配对找收尾，可以跨多行</td></tr>
+<tr><td>3</td><td>内容行“每一行都要带前缀”的写法</td><td>取消：整段内容包在一对 <code>[</code> … <code>]</code> 里，里面的每一行原样参与解析</td></tr>
+<tr><td>4</td><td>表格里的写法</td><td>明确成例：按钮放在某一行的单元格里，内容区写在紧跟的 <code>[id]~&gt;[</code> … <code>]</code> 里，里面的表格行用 <code>[+]</code> 继续与上方合并</td></tr>
+</tbody></table>
+
+<h3>C.8 第 9 稿（还原本稿擅自改动过的原稿结构）</h3>
+<table>
+<thead><tr><th>#</th><th>位置</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>总览表的 ruby 三行</td><td>原稿用 <code>[+]</code> 把「上标 / 下标 / 上下」三行<strong>并到同一个 <code>ruby text</code> 行标下</strong>，本稿却把它们拆成了 <code>ruby text（上标）</code> <code>（下标）</code> <code>（上下）</code> 三个行标。已还原成原稿写法</td></tr>
+<tr><td>2</td><td>总览表的竖排两行</td><td>原稿是普通的 <code>\| [+] \|\|</code> 续行，本稿擅自改成了 <code>~[ 其他写法 ][]</code> 折叠块。已还原</td></tr>
+<tr><td>3</td><td>表头的 <code>%</code></td><td>见 C.5 / C.7——左侧那个 <code>%</code> 是本稿加的，原稿里从来只有右侧一个</td></tr>
+</tbody></table>
+
+<h3>C.12 第 13 稿（全篇自查：补齐转换器未实现的部分，并修正自身不一致的示例）</h3>
+<table>
+<thead><tr><th>#</th><th>位置</th><th>问题</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>3.7 分离式折叠块 · 折叠表格行</td><td>mbmd 里按钮<strong>独占一行</strong>（<code>|[+]| [其他写法]~&gt;[f1] |</code>，<code>[+]</code> 把第一列向上并掉），HTML 却把按钮写进了第一行的单元格、<code>rowspan</code> 写成 3</td><td>该例子后来被 C.13 第 4 条整个换掉了</td></tr>
+<tr><td>2</td><td>3.13 选择框</td><td>mbmd 的默认值是 <code>(default)</code>，而 <code>default</code> 不是任何选项的文字（按规则 2 应当不预选），HTML 却给 <code>option2</code> 加了 <code>selected</code></td><td>HTML 去掉 <code>selected</code> 并加注说明（mbmd 是原稿，不动）</td></tr>
+<tr><td>3</td><td>3.14 规则 1 与规则 4</td><td>规则 1 说“结束位置取三者中最靠前的一个”，规则 4 说“标签文字就是它前面的全部内容”，两句在“冒号与元素之间还夹着别的文字”时会互相矛盾</td><td>明确成：绑定对象必须紧跟在结束位置之后（中间只允许空格），标签文字是结束位置之前的内容</td></tr>
+<tr><td>4</td><td>3.18 规则 1 与 3.9.5 规则 1</td><td>3.18 写的是“结束标识<strong>连续</strong>出现 n 次时不结束”，3.9.5 写的是“前 n 次不结束”，只有后者解释得了 3.9.5 的例子</td><td>3.18 统一成“遇到结束标识时，前 n 次不结束”</td></tr>
+<tr><td>5</td><td>第 0 节 规则 6</td><td>只说了先切行内代码段，没说 <code>{|…|}</code>（排版调整语句）里也含 <code>|</code>，而 3.9.4 的单元格例子 <code>|内容{|:---:|} |</code> 正靠它才不被切坏</td><td>补上“先切出行内代码段与排版调整语句，再按 <code>|</code> 切分”</td></tr>
+</tbody></table>
+
+<p>转换器侧同步修好、但不动标准的：<code>::文字: 元素</code> 的后两种写法会把 <code>:</code> 一起吃掉、行尾与单元格末尾的 <code>{|…|}</code> 不生效、<code>{/</code>=n}<code> 只被跳过而没实现语义、</code><code>少了</code>height<code>、表格切分遇到 </code>` 会切坏。</p>
+
+<h3>C.13 第 14 稿（分离式折叠块：按钮的 <code>~</code>，以及“不打断表格”）</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>结论</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>按钮到底是 <code>~[标题]~&gt;[标识符]</code> 还是 <code>[标题]~&gt;[标识符]</code></td><td><strong>以带 <code>~</code> 的 <code>~[标题]~&gt;[标识符]</code> 为准</strong>——它跟一般折叠块 <code>~[标题][内容]</code> 用同一个开头，表示“这是个折叠相关的东西”。第 11 稿本来就是这么写的（见 C.10）；第 12 稿（C.11）把 <code>~</code> 去掉属于收窄过头。<strong><code>~</code> 不能省略</strong>：写成没有 <code>~</code> 的 <code>[标题]~&gt;[标识符]</code> 不成立</td></tr>
+<tr><td>2</td><td>定界符能不能省</td><td><strong>一个都不能省</strong>——按钮的 <code>~</code>、<code>~[标题]</code>、<code>~&gt;[标识符]</code>；内容的 <code>[标识符]~&gt;[</code> … <code>]</code>。<strong>一般折叠块开头的 <code>~</code> 也一样</strong>：<code>[标题][内容]</code> 不会被当成折叠块</td></tr>
+<tr><td>3</td><td>折叠语句会不会把表格打断</td><td><strong>不会</strong>。按钮放在表格行里时，它只是该单元格里的一个行内元素（编译成 <code>&lt;input type=&quot;checkbox&quot;&gt;</code> + <code>&lt;label&gt;</code>）；内容区里的表格行照旧按 <code>[+]</code> 与上面的行合并，折叠时只把这些行藏起来（<code>hidden</code>）。收尾的 <code>]</code> 也<strong>不结束表格</strong>——它后面紧跟着的 <code>| … |</code> 仍属于同一张表</td></tr>
+<tr><td>4</td><td>3.7 的“折叠表格行”例子</td><td>换成这种写法：按钮写在某个表格行的单元格里（<code>|[+]|| ~[其他写法]~&gt;[f1] |[+]|</code>），内容区紧跟其后，收尾 <code>]</code> 之后表格继续</td></tr>
+<tr><td>5</td><td><code>[+]</code> 向上合并时找错了列（转换器的 bug）</td><td>原来按“渲染后剩下的格”数列号，结果 <code>[+]</code> 会并到<strong>已经被并掉</strong>的那一列上（本例里按钮那一格会被错误地纵向拉长）。已改成按<strong>逻辑列</strong>向上找最近的活单元格</td></tr>
+<tr><td>6</td><td>定界符少写一个时会怎样</td><td><strong>不能省</strong>：按钮少了开头的 <code>~</code>（写成 <code>[标题]~&gt;[标识符]</code>）、或少了 <code>[</code>／<code>]</code>，都不是按钮，按普通文本输出；内容区少了收尾的 <code>]</code> 就<strong>不当折叠内容处理</strong>，整段按普通文本 / 普通表格行输出（附录 B 第 8、12 条），<strong>不会把后面的内容吞掉</strong>。转换器已按此修正——按钮少了开头的 <code>~</code>（写成 <code>[标题]~&gt;[标识符]</code>）同样不成立，一般折叠块少了 <code>~</code>（写成 <code>[标题][内容]</code>）也一样不是折叠块</td></tr>
+</tbody></table>
+
+<h3>C.14 第 15 稿（总览表改用分离式折叠块）</h3>
+<table>
+<thead><tr><th>#</th><th>位置</th><th>问题</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>第 2 节总览表的 5 处 <code>~[ 其他写法 ][</code> … <code>][]</code></td><td>用的是“一般折叠块放在单元格里、内容行透明并入表格”的旧写法，和分离式折叠块做的是同一件事</td><td>全部改成<strong>分离式</strong>：按钮行写成 <code>|[+]|| ~[其他写法]~&gt;[f1] |[+]|</code>，内容区用 <code>[f1]~&gt;[</code> … <code>]</code> 把原来那几行包起来（<code>f1</code>…<code>f5</code> 一一对应）。<strong>行数、<code>[+]</code> 的合并关系、文字内容都保持原样</strong>，只是把折叠的写法换了</td></tr>
+<tr><td>2</td><td>3.7 规则 7</td><td>“放在表格单元格里的一般折叠块是透明的、内容行会并入表格”——现在没人用它，且与分离式折叠块重复</td><td><strong>删掉</strong>。3.7 规则 6 补一句：一般折叠块放在单元格里时就是个普通块级折叠块（只折自己那一格），要折<strong>表格行 / 列表项</strong>一律用分离式</td></tr>
+<tr><td>3</td><td>3.7 分离式折叠块 规则 1</td><td>举例还写着 <code>mbd-ruby</code>，本文档已经没有这个例子了</td><td>改成 <code>mbd-f1</code></td></tr>
+<tr><td>4</td><td>第 2 节总览表“选择框”行的 html 格</td><td>还留着 <code>&lt;option selected&gt;option2&lt;/option&gt;</code>，与 C.12 第 2 条（<code>(default)</code> 不预选）矛盾——同一个 mbmd 在 3.13 里已经不预选了</td><td>html 格去掉 <code>selected</code>，与 3.13 一致（mbmd 是原稿，不动）</td></tr>
+</tbody></table>
+
+<blockquote>
+<p>转换器对旧的“一般折叠块折表格行”写法仍然<strong>容忍</strong>（照旧能把内容行并进表格），但标准不再规定这种写法，新文档请一律用分离式。另外，转换器修掉了一个会把表格切断的 bug：内容区的第一行原本是 <code>[标识符]~&gt;[</code> 后面剩下的<strong>空字符串</strong>，它被误判成“不是表格行”，于是整个内容区被当成普通块、表格也到此为止（后面的行全成了段落）。现在空行不参与这个判断。</p>
+</blockquote>
+
+<h3>C.15 第 16 稿（按转换器实测反馈：折叠语句不再切断表格）</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>现象：表格里的分离式折叠块会把表格切断——内容区里的行、以及它<strong>后面所有行</strong>都变成普通段落</td><td>见下面两条</td></tr>
+<tr><td>2</td><td>根因：内容区的第一行是 <code>[标识符]~&gt;[</code> 后面剩下的<strong>空字符串</strong>，它被当成“不是表格行”，于是内容区不被算进表格，表格还被判定为<strong>到此结束</strong></td><td>空行不参与“是不是表格行”的判断（真正的空行另有含义：有并过行时表示“并入到此为止”）</td></tr>
+<tr><td>3</td><td>只要一行<strong>长得像</strong>内容区（<code>[标识符]~&gt;[</code>），在表格 / 列表里就一律按内容区处理，<strong>绝不切断结构</strong>；若找不到对应的按钮，就<strong>不隐藏</strong>这些行（免得内容再也点不出来）</td><td>转换器按此实现</td></tr>
+<tr><td>4</td><td>宽容处理</td><td><code>~</code> 也允许写成全角 <code>～</code>、<code>&gt;</code> 写成 <code>＞</code>；方括号内首尾的空格不计入标识符</td></tr>
+<tr><td>5</td><td>加入两条日志提示，免得以后再“悄悄坏掉”</td><td>①「发现折叠内容区 <code>[id]~&gt;[</code>，但没有找到对应的按钮 <code>~[标题]~&gt;[id]</code>」；②「<code>[标题]~&gt;[id]</code> 看起来像按钮，但少了开头的 <code>~</code>」</td></tr>
+</tbody></table>
+
+<h3>C.16 第 17 稿（表格里折叠一整行：不再用 display:none）</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>结论</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>现象</td><td>表格里折叠“一整行”后，跨行的单元格（<code>[+]</code> 合并出来的 <code>rowspan</code>）把后面的行<strong>整片挤歪</strong>：有的行整排往右挪、列里出现空白，有的又掉回第一列，整张表看起来散架；收起时、展开时都错，只是错法不同</td></tr>
+<tr><td>2</td><td>根因</td><td>用 <code>hidden</code> / <code>display:none</code> 藏行时，<strong>被藏的行不再占表格的格位</strong>，而 <code>rowspan</code> 是按“行数”算的：于是那个 <code>rowspan</code> 要么盖住不该盖的行、要么盖不住该盖的行。改成按“看得见的行数”重算 <code>rowspan</code> 也不行——隐藏行到底占不占位，各浏览器并不一致</td></tr>
+<tr><td>3</td><td>处理</td><td>表格里的折叠<strong>不藏行</strong>：行仍然留在表格里，只给它加一个类 <code>mb-fold-off</code>，由 CSS 收掉那一行的内容、内边距与边框（<code>visibility:hidden; font-size:0; padding:0; border:0; height:0</code>，并把它的行内元素 <code>display:none</code>）。这样 <code>rowspan</code> 一律按<strong>原始跨度</strong>给、<strong>任何状态都不用重算</strong>，展开收起时其它行一点都不动</td></tr>
+<tr><td>4</td><td>标准侧</td><td>1.1 加 <code>.mb-fold-off</code> 那一套；3.7 的“折叠表格行”例子改用 <code>class=&quot;mb-fold-off&quot;</code>；3.20.1 规则 3 里“按可见行数重算 <code>rowspan</code>”的旧说法作废</td></tr>
+<tr><td>5</td><td>转换器侧</td><td>生成端恢复按原始跨度给 <code>rowspan</code>（不再输出 <code>data-mb-span</code>）；运行时改成 <code>classList.toggle('mb-fold-off')</code>，删掉 <code>fixSpans</code></td></tr>
+</tbody></table>
+
+<h3>C.17 第 18 稿（竖排的方括号、put / rplc 再解析、变量共享、trigger / call / use、t、表格滑动）</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>竖排文本解析不了</td><td>竖排的定界符是 <strong><code>[|[内容]|]</code></strong>（内外两层方括号都是必需的，<code>[|内容|]</code> 不合法）。3.19 规则 1 与附录 B 第 6 条已改，转换器也只认 <code>[|[</code> … <code>]|]</code></td></tr>
+<tr><td>2</td><td><code>put</code> 输出的内容不能参与解析</td><td><code>put</code> 插入的文本现在会被<strong>当成 mb 文本再解析一遍</strong>，并且与紧邻的已有文本<strong>合起来</strong>再解析（页面已有 <code>a*</code>，在它前面输出 <code>*a</code> 就成斜体 <code>*aa*</code>）——见 3.9.3 规则 6</td></tr>
+<tr><td>3</td><td><code>rplc</code> 完全没效果</td><td>原来靠“先执行到 rplcStart、再执行到 rplcEnd”这两个记号作为条件，可 <code>rplc</code> 语句通常就写在两个标记<strong>之间</strong>，按执行顺序永远等不到 rplcEnd。改成<strong>按文档位置</strong>找最近的一对标记，直接删掉「一对标记 + 中间全部内容」（<code>rplc</code> 语句自己也会消失）再插入新文本；插入的文本同样再解析</td></tr>
+<tr><td>4</td><td>赋值语句创建的变量，别处看不到</td><td>变量表改成<strong>文档级共享</strong>（<code>DOC_SCOPE</code>）：<code>{</code>$a=1<code>}</code> 写下的变量，别的语句与触发器都能用。触发器里的计算语句改成“<strong>只算不输出</strong>”（转换器把它编成 <code>{{calc:…}}</code>，运行时只求值、不插入结果）</td></tr>
+<tr><td>5</td><td>新增 trigger / call / use</td><td><code>trigger:&quot;flag&quot;</code> 把同一组里它<strong>后面</strong>的语句记在 <code>flag</code> 名下、<strong>先不执行</strong>；<code>call:&quot;flag&quot;</code> 在 <strong>trigger 原来的位置</strong>执行它们（<code>put</code> 就输出在原处），<code>use:&quot;flag&quot;</code> 在 <strong>use 的位置</strong>执行。三者都能被按钮 / 输入框等触发器调用</td></tr>
+<tr><td>6</td><td>新增 <code>t</code> 函数</td><td><code>{{t:&quot;标题&quot;}}</code> 设置页面标题</td></tr>
+<tr><td>7</td><td>表格超宽</td><td>实现应当让表格<strong>左右滑动</strong>（<code>display:block; overflow-x:auto; max-width:100%</code>）：已加进转换器的文档样式，并在 1.2 里写明</td></tr>
+<tr><td>8</td><td>待办</td><td><code>![替代文本](url)</code> 支持视频 / 音频（按文件头识别类型、音频显示封面）——还没做</td></tr>
+</tbody></table>
+
+<h3>C.18 第 19 稿（触发语句分组数错括号：trigger / call / use 一度“完全没效果”）</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>症状与根因</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>单独成行写成 <code>{{trigger:&quot;flag&quot;}}{{put:&quot;hello&quot;}}</code>（两对花括号并列）时，编译出来的 <code>data-mb</code> 中间是 <code>}}{{</code></td><td>运行时先切掉最外层的 <code>{{ }}</code>，里面剩下 <code>…}}{{…</code>；分组函数数括号时 <code>{{</code> 多算一层、<code>}}</code> 少合一层，<strong>第二段语句被切成 <code>{put:&quot;hello&quot;</code></strong>（开头多一个 <code>{</code>、结尾少一个 <code>}</code>）→ 函数名变成 <code>{put</code> → “未知函数”。于是 <code>trigger</code> 登记的是一段无效语句，<code>call</code> / <code>use</code> 自然毫无效果</td><td>① 转换器里，单独成行的执行语句改走行内那条路，统一输出成 <code>{{a}{b}}</code>；② 运行时加一层<strong>规范化</strong>（把 <code>}}{{</code> 收成 <code>}{</code>），两种写法都先规范再分组——<strong>旧文档里已经生成过的 <code>data-mb</code> 也能被救回来</strong></td></tr>
+<tr><td>2</td><td>3.9.3 规则 8 前补一句</td><td><code>{{a}}{{b}}</code> 与 <code>{{a}{b}}</code> 等价，实现两者都要能正确拆分</td><td>已写入</td></tr>
+</tbody></table>
+
+<h3>C.19 第 20 稿（图片 / 视频 / 音频：按文件内容判断类型，并把内嵌封面取出来显示）</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><code>![替代文本](url)</code> 原来一律输出 <code>&lt;img&gt;</code>，实现不了视频 / 音频</td><td>新增 <a href="#321-图片--视频--音频">3.21</a>：同一段语法按<strong>文件内容</strong>判断是图片 / 视频 / 音频，<strong>不看地址后缀</strong>——按文件头（magic number）或容器内部的标识判断。图片输出 <code>&lt;img&gt;</code>、视频输出 <code>&lt;video controls&gt;</code>、音频输出 <code>&lt;audio controls&gt;</code></td></tr>
+<tr><td>2</td><td>音频的封面</td><td><strong>不只是</strong> MP3 的 ID3v2 <code>APIC</code>：还要支持 FLAC 的 <code>PICTURE</code> 块、Vorbis comment 的 <code>METADATA_BLOCK_PICTURE</code>、Ogg（Vorbis / Opus）comment header 里的 <code>METADATA_BLOCK_PICTURE</code> / <code>COVERART</code>，以及 WAV 里<strong>非标准</strong>的 <code>ID3 </code> 块。有多个时取第一个；MIME 按封面自己的魔数确定；封面显示在播放控件<strong>上方</strong>（行内块容器 <code>.mb-media-cover</code>，<strong>不用</strong> <code>&lt;figure&gt;</code>——这段语法常在 <code>&lt;p&gt;</code> 里，块级元素会截断段落）</td></tr>
+<tr><td>3</td><td>无脚本 / 取不到内容时怎么办</td><td>编译时先输出<strong>基本形态</strong> <code>&lt;img&gt;</code>，运行时判断出是视频 / 音频再替换——最差也只是显示成图片，不会整段消失（见 3.21 规则 6～9）</td></tr>
+<tr><td>4</td><td>1.1 补样式</td><td><code>.mb-media</code> / <code>.mb-media-cover</code>（<code>max-width: 100%</code>，封面在上）</td></tr>
+<tr><td>5</td><td>转换器</td><td>编译期输出 <code>&lt;img src alt data-mb-media=&quot;…&quot;&gt;</code>；运行时用 <code>Range</code> 读文件头判类型并替换成 <code>&lt;video&gt;</code> / <code>&lt;audio&gt;</code>，音频再按容器格式抠封面（逐步加大读取量，最多 16 MB）；<code>fetch</code> 取不到时退回用 <code>&lt;video preload=&quot;metadata&quot;&gt;</code> 的 <code>loadedmetadata</code> 探测（本地文件 / 跨域也能用），仍失败就按图片输出；每一步都写进日志条</td></tr>
+<tr><td>6</td><td>待定</td><td>第 2 节总览表要不要加一行「图片 / 视频 / 音频」；这些元素要不要加 <code>role</code> / <code>aria-label</code></td></tr>
+</tbody></table>
+
+<h3>C.20 第 21 稿（命名语句写在元素<strong>后面</strong>）</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>3.1 原来写的是「给它<strong>后面</strong>紧邻的元素取名字」，示例也写成 <code>{#note1.warn}注意这一段</code>（命名语句在<strong>前面</strong>）</td><td>改成<strong>写在元素后面</strong>：<code># 标题1 {#t1}</code>、<code>这一整段文字 {#note1.warn}</code>。与排版调整语句 <code>{|…|}</code> 的行尾用法一致（那个一直写在块 / 单元格末尾）</td></tr>
+<tr><td>2</td><td>「目标是谁」原来只有一句“它后面紧邻的元素（或它所在的那一行/块）”，块与行内元素分不清</td><td>3.1 补一张对照表：前面是<strong>普通文字</strong>（不是元素）→ 给<strong>它所在的那个块</strong>取名；前面是一个<strong>完整的元素</strong> → 给<strong>那个元素</strong>取名（<code>**注意**{#w1}</code> → <code>&lt;strong id=&quot;w1&quot;&gt;</code>，<code>![猫](cat.png){#cat}</code> → <code>&lt;img id=&quot;cat&quot;&gt;</code>；表格单元格末尾的 <code>{#c1}</code> → 该 <code>&lt;td&gt;</code>）</td></tr>
+<tr><td>3</td><td>单独成行的 <code>{#x}</code></td><td>前面没有元素，实现可以作用到<strong>下一个块</strong>（旧写法的兼容）。<strong>是否改成“上一个块”待定</strong></td></tr>
+<tr><td>4</td><td>转换器：标题、列表项根本收不到命名语句</td><td><code>inline()</code> 调用时没传 <code>scope</code>，所以 <code># 标题1 {#t1}</code> 里的名字被<strong>悄悄丢掉</strong>（这正是本次要修的主症状）。现在标题、列表项、表格单元格都会把末尾的命名语句落到自己身上</td></tr>
+<tr><td>5</td><td>转换器：写在元素<strong>前面</strong>时的行为</td><td><code>injectLast</code>（找“最后一个开标签”）会把名字挂到<strong>不相干的</strong>内层元素上（<code>这是*斜体*的 {#p}</code> 会挂到 <code>&lt;em&gt;</code>），而前面全是普通文字时名字直接<strong>丢失</strong>。现在按元素边界判断：末尾正好是一个完整元素才挂给它，否则交给所在的块</td></tr>
+<tr><td>6</td><td>旧写法（写在前面）</td><td>仍然容忍（<code>{#x}文字</code> 作用到本块），但会在日志里提示「命名语句写在了元素前面：应写成「元素 」」</td></tr>
+<tr><td>7</td><td>顺带自查</td><td>3.1 第 2 条「没有 <code>#</code>／<code>.</code> 前缀时按 <code>id</code> 处理（<code>{xxx}</code> 等价于 <code>{#xxx}</code>）」——<strong>转换器一直没实现</strong>（只认 <code>{#…}</code> / <code>{.…}</code>）。<strong>C.21 已决定：删掉这条规则</strong>（<code>{xxx}</code> 不再当作命名语句）</td></tr>
+</tbody></table>
+
+<h3>C.21 第 22 稿（命名语句收尾：位置、类名、aria-label）</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>单独成行的 <code>{#x}</code> 管哪个块</td><td>改成作用到<strong>它上面</strong>的那个块（以前是下面的块）；上面还没有块时才作用于下面的块。3.1 规则 3 已写</td></tr>
+<tr><td>2</td><td>「没有 <code>#</code>／<code>.</code> 前缀时按 <code>id</code> 处理（<code>{xxx}</code> 等价于 <code>{#xxx}</code>）」</td><td><strong>删掉</strong>这条规则。<code>{xxx}</code> 不再当作命名语句，按普通文字原样输出（附录 B 第 12 条）</td></tr>
+<tr><td>3</td><td>只设类名 / 多个类名</td><td>3.1 补两条：<code>{.classname}</code> 只设类名；<code>{#id.c1.c2.c3}</code> → <code>id=&quot;id&quot; class=&quot;c1 c2 c3&quot;</code>。转换器本来就按这个解析，另加入 <code>namesAttrs()</code> 把<strong>多条并存</strong>的命名语句合起来（<code>{#t1}{.c1.c2}</code> → <code>id=&quot;t1&quot; class=&quot;c1 c2&quot;</code>）；标题 / 段落 / 列表项 / 表格单元格都支持</td></tr>
+<tr><td>4</td><td>新增 <code>((描述))</code>：在<strong>任何元素后面</strong>写一对双层圆括号，加 <code>aria-label</code></td><td>定位规则与命名语句<strong>完全相同</strong>（前面是完整元素 → 那个元素；前面是普通文字 → 它所在的那个块；单独成行 → 它上面的块）。新增 <strong>3.22</strong>，第 2 节总览表也加了「图片 / 视频 / 音频」一行</td></tr>
+<tr><td>5</td><td>视频 / 音频的可访问名称</td><td>3.21 补规则 10：用 <code>((…))</code> 写；没写时用替代文本当 <code>aria-label</code>。转换器把 <code>&lt;img&gt;</code> 换成 <code>&lt;video&gt;</code> / <code>&lt;audio&gt;</code> 时，会把编译期写在 <code>&lt;img&gt;</code> 上的 <code>id</code> / <code>aria-label</code> / <code>role</code> / <code>title</code> 一起带过去</td></tr>
+<tr><td>6</td><td>正文里的 <code>((</code></td><td>会被当成 aria 标签（文字不再显示）。要原样显示时用转义符 <code>\(</code>，已写进 3.22 规则 7</td></tr>
+</tbody></table>
+
+<h3>C.22 第 23 稿（跨行解析、行尾 <code>\</code>、图表类型改英文、LaTeX 公式、取消自定颜色）</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>竖排文本 <code>[|[ ]|]</code> / <code>「「」」</code> 不能跨行</td><td>转换器在段落里先把<strong>未闭合</strong>的竖排定界符接成一行再解析（C.23：空行也不打断了）；换行照旧另起一列（3.19 规则 6）。3.19 规则 6 里补写「可以跨行书写」</td></tr>
+<tr><td>2</td><td>原始文本 <code>[o[ ]o]</code> 不能跨行</td><td>同上。3.16 规则 1 补「可以跨行书写」（C.23：空行也不打断）</td></tr>
+<tr><td>3</td><td>行尾 <code>\</code> 接行</td><td>3.15 规则 4 原来只写了「把下一行接上来」，转换器并<strong>没有</strong>真的接上（按行解析，永远碰不到那个换行）。现在：行尾的 <code>\</code> 把下一行<strong>原样接上来</strong>（不留空格、不留换行），接上之后整段照常解析——<code>**a\</code> ＋ 换行 ＋ <code>b**</code> → <code>&lt;strong&gt;ab&lt;/strong&gt;</code>，3.15 规则 4 补了这个例子</td></tr>
+<tr><td>4</td><td>图表类型改为英文</td><td><code>bar</code> / <code>line</code> / <code>pie</code> / <code>table</code>（旧的汉语名一度容忍，<strong>C.23 已去掉</strong>）。3.9.6 的类型表、四个例子、规则 1 / 2 都改了</td></tr>
+<tr><td>5</td><td>新增 LaTeX 公式</td><td>行内 <code>$公式$</code>、行间 <code>$$$</code> … <code>$$$</code>（可跨行）。新增 <strong>3.23</strong>；与变量的区分：<code>$…$</code> 里<strong>恰好是合法变量名</strong>时按变量（3.9.8），否则按公式；想强制当公式就在内容前后各加一个空格（<code>$ x $</code>）。参考实现用 <strong>KaTeX</strong>：只有文档里有公式时才引入它的 CSS / JS，没加载到就按原文显示。总览表加了「LaTeX 公式」一行</td></tr>
+<tr><td>6</td><td>取消「上色语法可指定颜色」</td><td>3.6 规则 2 删掉（原第 3 条顺延）：定界符里一律按<strong>原样文字</strong>处理——<code>!'#e33'红色'!</code> 里的 <code>#e33</code> 就是普通文字。要单独改色，用命名语句取名字（<code>!'红色'!{.warn}</code>）再写 CSS。转换器里 <code>colorSpan()</code> 也去掉了这段</td></tr>
+<tr><td>7</td><td>第 0 节第 2 条</td><td>补上「媒体类型判断、公式渲染」这两个同样依赖脚本的功能，并写明没有脚本时的退路（媒体按图片输出、公式按原文显示）</td></tr>
+<tr><td>8</td><td>顺带</td><td>转换器的小节改动：段落里加了 <code>joinHardLines()</code>（行尾 <code>\</code>）与 <code>mergeMultiline()</code>（跨行）；列表项也接了行尾 <code>\</code>。附录 A 仍是「最小运行时」，媒体 / 公式这两块只在转换器里的运行时副本中</td></tr>
+</tbody></table>
+
+<h3>C.23 第 24 稿（图表类型只留英文；竖排 / 原始文本不再被空行打断）</h3>
+<table>
+<thead><tr><th>#</th><th>问题</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>图表类型的旧汉语名（<code>柱</code> <code>折</code> <code>饼</code> <code>表</code>）</td><td><strong>去掉</strong>：只认 <code>bar</code> / <code>line</code> / <code>pie</code> / <code>table</code>（附录 B 第 11 条：关键字区分大小写）。写别的名字按附录 B 第 12 条<strong>原样输出</strong>，并给出一条警告 <code>未知的图表类型：柱（可用 bar / line / pie / table）</code>。3.9.6 的类型表说明也改了</td></tr>
+<tr><td>2</td><td>竖排文本、原始文本跨行时<strong>被空行打断</strong></td><td>改成跨行解析、<strong>空行也不打断</strong>——它们的收尾靠的是明确的结束标识（<code>]|]</code> / <code>」」</code> / <code>]o]</code>），而不是“这一行完了”。转换器把这一步从“段落内接行”提前到<strong>块级</strong>（<code>mergeMultilineBlocks()</code>）：遇到未闭合的 <code>[|[</code> / <code>[o[</code> / <code>「「</code> / <code>『『</code> 就往下接，空行照接，直到找到收尾标识；代码块里的一行都不动</td></tr>
+<tr><td>3</td><td>附录 B 第 7 条「不可跨空行」</td><td>补上<strong>例外</strong>：竖排、原始文本、行间公式都可以跨空行。3.16 规则 1、3.19 规则 6 也改成「空行也不打断」</td></tr>
+<tr><th scope="row">4</th><th scope="row">误判防护</th><th scope="row">检测“有没有未闭合”时<strong>先去掉行内代码段</strong>——所以正文里写 <code>`[|[`</code>、讲语法的那种句子不会被误判成跨行的开始（本文档里就有好几处这样的写法）</th><td>5</td><td>第 2 节与附录 C 里的旧例子</td><td>C.2 里那个 <code>{[柱:$a,$b,$c]}</code> 写在<strong>行内代码</strong>里，不会被解析，所以不受影响</td><td>### C.24 第 25 稿（排版调整语句的浮动容器：图片溢出、压住正文）</td><td>#</td><td>问题</td><td>处理</td><td></td><td>-----</td><td>-----</td><td>-----</td><td></td><td>1</td><td>现象（图 1）</td><td><code>{|--.5|}</code> 配一张图时，图片按<strong>原始尺寸</strong>铺开，比容器高出一大截；容器只有 <code>height: 5em</code>，超出的部分<strong>溢出</strong>在容器外边，而浏览器不会为溢出的部分让路——于是图片压住了下面几行正文（看起来“文字和图片叠在一起”），浮动也没能浮到右侧</td><td></td><td>2</td><td>根因</td><td>① 转换器把 <code>![图](…)</code> 编译成 <code>&lt;p&gt;&lt;img …&gt;&lt;/p&gt;</code>，在容器里<strong>多套了一层 <code>&lt;p&gt;</code></strong>（3.9.4 的示例里是光秃秃的 <code>&lt;img&gt;</code>），<code>height</code> 的百分比参照就落在这层 <code>&lt;p&gt;</code> 上；② CSS 里没有任何“按容器高度缩放”的规则，图片一律按原尺寸</td><td></td><td>3</td><td>处理</td><td>① 排版调整语句包住的内容<strong>只有一个元素</strong>（如一张图）时，编译时把外层 <code>&lt;p&gt;</code> 去掉（与 3.9.4 示例一致）；② 1.1 补上：浮动 / 占位容器里的图片（视频）按容器高度缩（<code>max-height: 100%</code>），容器里若还留着一层 <code>&lt;p&gt;</code>，给它 <code>margin: 0; height: 100%</code></td><td></td><td>4</td><td>标准侧</td><td>3.9.4 补规则 5：容器有明确高度时里面的元素应当按容器高度缩放，只有单个元素时不要再套 <code>&lt;p&gt;</code></td><td>### C.25 第 26 稿（排版语句写在行尾时，容器没有高度）</td><td>#</td><td>问题</td><td>处理</td><td></td><td>-----</td><td>-----</td><td>-----</td><td></td><td>1</td><td>现象</td><td><code>![图](…) {|--.5|}</code>（排版语句写在<strong>图片所在那一行的末尾</strong>）时，图片虽然浮到了右边，但<strong>小得可怜</strong>、只占两三行——与 <code>{|--.5|}</code> 单独成行时的效果完全不同</td><td></td><td>2</td><td>根因</td><td>写在行尾时走的是<strong>段落</strong>那条路：只把 <code>mb-float-right</code> 这个<strong>类</strong>加到那一段的 <code>&lt;p&gt;</code> 上，<strong>没有</strong> <code>height: 5em</code>（<code>height</code> 只有在“单独成行”的 <code>layoutWrap()</code> 里才生成）。容器没有明确高度 → 里面的 <code>max-height: 100%</code> 失去参照 → 元素缩成一个与预期无关的小尺寸</td><td></td><td>3</td><td>处理</td><td>段落里<strong>只有一个元素</strong>、又带了位置类（<code>mb-float-right</code> / <code>mb-float-left</code> / <code>mb-block</code> / <code>mb-inline-middle</code>）时，改走 <code>layoutWrap()</code>：包一层容器、生成 <code>height</code>。行尾写法与单独成行现在<strong>输出完全一样</strong></td><td></td><td>4</td><td>标准侧</td><td>3.9.4 补规则 6（行尾写法与单独成行等价，都要生成容器）与规则 7（「行数」只对元素有意义；文字段落的高度由文字自己决定）</td><td>### C.26 第 27 稿（媒体的最大高度）</td><td>#</td><td>问题</td><td>处理</td><td></td><td>-----</td><td>-----</td><td>-----</td><td></td><td>1</td><td>一张很长的图会把整屏占满</td><td>给媒体（图片 / 视频）加<strong>最大高度</strong>：<code>max-height: min(75vh, 80vw)</code> —— 取「视口高度的 75%」与「视口宽度的 80%」里<strong>较小</strong>的那个。1.1 补了这条；3.21 补规则 11</td><td></td><td>2</td><td>与浮动 / 占位容器的关系</td><td>容器里那条 <code>max-height: 100%</code>（按容器高度缩）选择器<strong>更具体，所以仍然优先</strong>（否则会把 C.24 修好的溢出问题又引回来）；容器自己带 <code>height</code> 时也带上同一个上限，<code>{|--.40|}</code> 这种很大的行数不会真的超过它</td><td></td><td>3</td><td>预览里的注意</td><td><code>vh</code> / <code>vw</code> 以<strong>文档所在的那个视口</strong>为准：预览是嵌在 iframe 里的，所以预览里的上限比下载后小（iframe ≈窗口的一半）。下载 / 打开生成的 HTML 之后就是整个窗口</td><td>### C.27 第 28 稿（媒体尺寸上限：宽 90vw、高 75vh）</td><td>#</td><td>问题</td><td>处理</td><td></td><td>-----</td><td>-----</td><td>-----</td><td></td><td>1</td><td>上限</td><td>改成 <strong>宽 ≤ <code>min(100%, 90vw)</code>、高 ≤ <code>75vh</code></strong>（原来是一条 <code>max-height: min(75vh, 80vw)</code>）。1.1 的媒体规则、3.21 规则 11、浮动 / 占位容器上的 <code>max-height</code> 都改了</td><td></td><td>2</td><td>宽度为什么还留着 <code>100%</code></td><td>只写 <code>90vw</code> 的话，宽屏上 <code>90vw</code> 比正文栏宽还大（栏宽 48rem），图片会<strong>溢出栏外</strong>；取两者较小者 = 不超过栏宽、同时不超过视口的 90%</td><td></td><td>3</td><td>优先级</td><td>媒体那条用<strong>元素选择器</strong> <code>img, video, audio</code>（比 <code>.mb-float-right img</code> 弱），所以容器里的元素仍然先按容器高度缩（C.24 / C.25 修好的行为不会被顶掉）；同时把正文基础样式里那条 <code>body.mb-doc img { max-width:100% }</code> 撤掉了——它比容器规则更具体，留着就会把容器里的缩放顶掉</td><td>### C.28 第 29 稿（<code>【内容】</code>不是 ruby）</td><td>#</td><td>问题</td><td>处理</td><td></td><td>-----</td><td>-----</td><td>-----</td><td></td><td>1</td><td>原来 <code>【内容】</code>（没写 <code>|</code> / <code>/</code>）会被当成“着重号”：把 <code>【】</code> 吃掉、还给每个字加一个 <code>●</code></td><td>改成：<strong>没有 <code>|</code> / <code>/</code> 就不是 ruby</strong>——连同 <code>【</code> <code>】</code> 一起按普通文本输出（里面的内容照常解析）。3.2 的两处说明改了，规则 3 也重写</td><td></td><td>2</td><td>着重点怎么写</td><td>必须写分隔符、后面留空：<code>【基字|】</code>（<code>●</code> 在上）、<code>【基字/】</code>（<code>●</code> 在下）——原来就是这样，只是把“<strong>分隔符不能省</strong>”写明白了</td><td></td><td>3</td><td>转换器</td><td><code>parseRuby()</code> 在没有分隔符时返回 <code>null</code>（不再返回“空 ruby”），调用处改成<strong>原样输出方括号</strong>；运行时重解析用的 <code>rubyLite()</code> 同样改（顺带补上了着重号的 <code>●</code>，与编译期一致）</td><td>### C.29 第 30 稿（新增 <code>quote</code>：引用其他 mbmd 文件）</td><td>#</td><td>问题</td><td>处理</td><td></td><td>-----</td><td>-----</td><td>-----</td><td></td><td>1</td><td>新增函数 <code>quote</code></td><td><code>{{quote:&quot;地址[范围]&quot;}}</code> —— 把另一个 mbmd 文件的内容引到这一处。3.9.3 的函数表加了一条；范围语法见<strong>新增的 3.24</strong>（行号 / 字符位、负数从末尾数、<code>#id</code> 锚点、两端闭区间）</td><td></td><td>2</td><td>在哪一步展开</td><td><strong>单独成行、且只有这一条语句</strong>时在<strong>编译期</strong>取回来并直接拼接——所以引用的内容会被完整解析（标题、表格、列表、功能语句都算）；写在按钮 / 输入框 / 触发器里，或与别的语句同组时留给<strong>运行时</strong>，那时插入的文本只按<strong>行内</strong>语法解析</td><td></td><td>3</td><td>范围切分的代码</td><td>新加一个共用块 <code>mb-range</code>（<code>MB_cut()</code>）：转换器用 <code>new Function</code> 加载它，生成的文档里也照原样带上、运行时的 <code>quote</code> 直接调它——范围逻辑<strong>只有一份实现</strong>，不会两边跑偏</td><td></td><td>4</td><td>取不到内容时</td><td>这一处<strong>保留原语句</strong>（按附录 B 第 12 条）并在日志里说明原因；不影响其它部分</td><td></td><td>5</td><td>顺带</td><td>转换器的渲染改成<strong>等引用取回后再编译</strong>（带序号，避免旧结果盖掉新输入）；日志条里会显示 <code>quote：已引用「…」（N 行）</code></td><td></td><td>6</td><td>附录 A</td><td>仍是「最小运行时」，不含 <code>quote</code> / 媒体 / 公式那几块（它们只在转换器里带的运行时副本中）</td><td>### C.30 第 31 稿（引用进来的内容里，功能语句要照常执行）</td><td>#</td><td>问题</td><td>处理</td><td></td><td>-----</td><td>-----</td><td>-----</td><td></td><td>1</td><td>现象</td><td><code>quote</code> 写在按钮 / 触发器里、或编译期取不到文件而落到<strong>运行时</strong>那条路时，插入的文本走的是 <code>put</code> / <code>rplc</code> 的老路——而那条路<strong>故意不重复执行</strong> <code>{{…}}</code>，于是引用来的内容里的功能语句<strong>原样显示</strong>出来了</td><td></td><td>2</td><td>处理</td><td>给 <code>quote</code> 单开一条插入路径 <code>insertQuoted()</code>：把引用来的文本按 <code>{{…}}</code> 执行语句 / <code>{$…$}</code> 变量语句 / <code>{`…`}</code> 计算语句拆开——文本部分按行内语法解析，这几个语句<strong>建成执行语句并当场执行</strong>（与“单独成行的执行语句”同样处理）；行内代码段里的不算语句</td><td></td><td>3</td><td>顺带</td><td>运行时插入的内容里，<strong>换行变成 <code>&lt;br&gt;</code></strong>（运行时没有块级解析器，这样至少不会把整段挤成一行）；块级语法仍按行内显示成原文——想<strong>完整</strong>解析请用单独成行的写法（编译期那条路）。<strong>C.31 已把这条推翻</strong>：运行时也带上编译器，块级语法照样解析</td><td></td><td>4</td><td><code>put</code> 不变</td><td><code>put</code> / <code>rplc</code> 插入的文本<strong>仍然不执行</strong>里面的功能语句（这是 C.17 定的，免得与触发器重复执行）。若希望它们也执行，另行确认</td><td>### C.31 第 32 稿（运行时插入的引用内容也用编译器整段解析）</td><td>#</td><td>问题</td><td>处理</td><td></td><td>-----</td><td>-----</td><td>-----</td><td></td><td>1</td><td>C.30 只让运行时那条路解析了行内语法与三类语句：标题、引用、竖排、原始文本、表格、列表、折叠块、按钮、输入框、图表、脚注、checkbox、<code>{:…:}</code>、<code>{|…|}</code>、<code>{[…]}</code>、<code>{/</code>=n}<code>、公式……全都显示成原文 | 改成：把**同一个编译器**（转换器用的那一份）在需要时也带进生成的文档（</code>window.mbCompile<code>）；运行时的 </code>quote<code>调它把引用来的内容**整段编译成 HTML** 再插进 DOM，并紧接着把新插进来的一片**接上运行时**（执行语句、按钮、输入框、折叠块、媒体、公式都会活起来） |
+| 2 | 怎么保证只有一份编译器 | 编译器那一段（第 0～6 节）在转换器页面里用</code>/<em>&lt;&lt;<MB_COMPILER>&gt;&gt;</em>/<code> 标记圈出，界面启动时把这段源码抽出来（</code>COMPILER_SRC<code>）；**只有文档里可能出现运行时引用**（源码里有 </code>quote:<code>）时才把它连同 KaTeX 一起写进生成的 HTML——不用引用的文档不会因此变大 |
+| 3 | 单独成行的引用 | </code>quote<code>单独成行时，它外面只包了一个</code><p><code>；运行时插入前会把那个 </code><p><code>换掉，免得把块级元素塞进段落里 |
+| 4 | 退回方案 | 生成的文档里若没有</code>window.mbCompile<code>（例如只带附录 A 的最小运行时），仍退回 C.30 那条行内插入路径，并在日志里说明 |
+| 5 | </code>put<code>/</code>rplc`</td><td>仍然不执行插入文本里的功能语句（C.17）；它们插入的是“值”，跟引用一整份文档不是一回事。若希望它们也执行，另行确认</td></tr>
+</tbody></table>
+
 <script>
+/* mb-range —— 引用范围（`quote` 的 `[…]`）
+   把一段 mb 文本按范围切出来。转换器用 new Function() 加载它，生成的文档里也照原样带上，
+   运行时的 quote 直接调 MB_cut()——只有一份实现。
+   MB_cut(text, '3:5')       → 第 3 行到第 5 行
+   MB_cut(text, '3[2]:5[6]') → 第 3 行第 2 个字符到第 5 行第 6 个字符
+   行号从 1 开始，负数从末尾数（-1 = 最后一行）；字符位也从 1 开始，负数从行尾数；
+   两端都是【闭区间】（含端点）。`{#id}` 锚点指的是 id 写在【哪一行】（见标准 3.24）。 */
+function MB_cut(text, spec) {
+  text = String(text == null ? '' : text);
+  var lines = text.split(/\r?\n/), n = lines.length;
+  spec = String(spec == null ? '' : spec).trim();
+  if (!spec) return text;
+  function warnQ(s) {
+    if (typeof window !== 'undefined' && window.mbRangeWarn) window.mbRangeWarn(s);
+    else if (typeof console !== 'undefined' && console.warn) console.warn('[mb] ' + s);
+  }
+  function fixLine(v) {
+    v = parseInt(v, 10);
+    if (isNaN(v) || v === 0) return null;
+    return v < 0 ? n + v + 1 : v;
+  }
+  function fixCh(v, lineText) {
+    v = parseInt(v, 10);
+    if (isNaN(v) || v === 0) return null;
+    return v < 0 ? lineText.length + v + 1 : v;
+  }
+  function anchorLine(id) {
+    var re = new RegExp('\\{[#.][^}]*' + String(id).replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&') + '[^}]*\\}');
+    for (var i = 0; i < n; i++) if (re.test(lines[i])) return i + 1;
+    warnQ('quote：找不到 id 为 ' + id + ' 的元素，这一处引用留空');
+    return null;
+  }
+  function parsePos(s) {
+    s = String(s).trim();
+    var m = /^#([^\s\[\]]+)(?:\[([\s\S]*)\])?$/.exec(s), base, inner, mm, m2, l2;
+    if (m) {
+      base = anchorLine(m[1]);
+      if (base === null) return null;
+      if (m[2] === undefined) return { line: base, ch: null };
+      inner = m[2].trim();
+      mm = /^(-?\d+)(?:\[(-?\d+)\])?$/.exec(inner);
+      if (!mm) { warnQ('quote：看不懂的范围「' + s + '」'); return null; }
+      return { line: base + (parseInt(mm[1], 10) || 0),
+               ch: mm[2] === undefined ? null : parseInt(mm[2], 10) };
+    }
+    m2 = /^(-?\d+)(?:\[(-?\d+)\])?$/.exec(s);
+    if (m2) {
+      l2 = fixLine(m2[1]);
+      if (l2 === null) { warnQ('quote：看不懂的范围「' + s + '」'); return null; }
+      return { line: l2, ch: m2[2] === undefined ? null : parseInt(m2[2], 10) };
+    }
+    warnQ('quote：看不懂的范围「' + s + '」');
+    return null;
+  }
+  /* 在最外层找第一个 ':'，把范围拆成 起 / 止 */
+  var depth = 0, colon = -1, i, ch;
+  for (i = 0; i < spec.length; i++) {
+    ch = spec.charAt(i);
+    if (ch === '[') depth++;
+    else if (ch === ']') depth--;
+    else if (ch === ':' && depth === 0) { colon = i; break; }
+  }
+  var a, b, t, L, c1, c2, out, first, fc, k, lastLine, lc;
+  if (colon >= 0) {
+    a = parsePos(spec.slice(0, colon));
+    b = parsePos(spec.slice(colon + 1));
+    if (!a || !b) return '';
+  } else {
+    var s1 = /^(-?\d+)\[(\d+):(\d+)\]$/.exec(spec);                        // 3[3:10]
+    var s2 = /^#([^\s\[\]]+)\[(-?\d+)\[(-?\d+):(-?\d+)\]\]$/.exec(spec);  // #id[1[2:9]]
+    var s3 = /^#([^\s\[\]]+)\[(-?\d+):(-?\d+)\]$/.exec(spec);              // #id[1:2]
+    if (s1) {
+      var l1 = fixLine(s1[1]);
+      if (l1 === null) return '';
+      a = { line: l1, ch: parseInt(s1[2], 10) };
+      b = { line: l1, ch: parseInt(s1[3], 10) };
+    } else if (s2) {
+      var b2 = anchorLine(s2[1]);
+      if (b2 === null) return '';
+      var l2b = b2 + (parseInt(s2[2], 10) || 0);
+      a = { line: l2b, ch: parseInt(s2[3], 10) };
+      b = { line: l2b, ch: parseInt(s2[4], 10) };
+    } else if (s3) {
+      var b3 = anchorLine(s3[1]);
+      if (b3 === null) return '';
+      a = { line: b3 + (parseInt(s3[2], 10) || 0), ch: null };
+      b = { line: b3 + (parseInt(s3[3], 10) || 0), ch: null };
+    } else {
+      a = parsePos(spec);
+      if (!a) return '';
+      b = { line: a.line, ch: null };          // 只写一个位置 → 取这一整行
+    }
+  }
+  a.line = Math.min(Math.max(a.line, 1), n);
+  b.line = Math.min(Math.max(b.line, 1), n);
+  if (b.line < a.line) { t = a; a = b; b = t; warnQ('quote：范围写反了，已按原样交换两端'); }
+  if (a.line === b.line) {                     // 同一行
+    L = lines[a.line - 1];
+    c1 = a.ch === null ? 1 : fixCh(a.ch, L);
+    c2 = b.ch === null ? L.length : fixCh(b.ch, L);
+    if (c1 === null) c1 = 1;
+    if (c2 === null) c2 = L.length;
+    return L.slice(c1 - 1, c2);
+  }
+  out = [];
+  first = lines[a.line - 1];
+  fc = a.ch === null ? 1 : fixCh(a.ch, first);
+  if (fc === null) fc = 1;
+  out.push(fc <= 1 ? first : first.slice(fc - 1));   // 第一行：从起始位置到行尾
+  for (k = a.line; k < b.line - 1; k++) out.push(lines[k]);   // 中间：整行
+  lastLine = lines[b.line - 1];
+  lc = b.ch === null ? lastLine.length : fixCh(b.ch, lastLine);
+  if (lc === null) lc = lastLine.length;
+  out.push(lastLine.slice(0, lc));                   // 最后一行：从行首到结束位置
+  return out.join('\n');
+}
 /* mb.js —— MarkBottom 0.1 参考运行时 */
 (function () {
   'use strict';
@@ -2109,6 +2615,103 @@ _(Commental)_
     MB_LOG.push(s);
     if (window.console && console.info) console.info('[mb] ' + s);
   }
+  /* quote：引用其他 mbmd 文件（标准 3.24）。范围切分用共用的 MB_cut()（见 mb-range 块）。 */
+  var QUOTE_CACHE = Object.create(null);
+  function fetchQuoteText(url) {
+    if (!QUOTE_CACHE[url]) {
+      QUOTE_CACHE[url] = fetch(url).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      });
+    }
+    return QUOTE_CACHE[url];
+  }
+  function splitQuoteArg(arg) {
+    var m = /^([\s\S]*?)\s*\[([\s\S]*)\]\s*$/.exec(String(arg));
+    if (!m) return { url: String(arg).trim(), spec: '' };
+    return { url: m[1].trim(), spec: m[2] };
+  }
+  function mbBraceEnd(s, i, open, close) {
+    var depth = 0, inStr = false, j, ch;
+    for (j = i; j < s.length; j++) {
+      ch = s.charAt(j);
+      if (inStr) { if (ch === '\\') j++; else if (ch === '"') inStr = false; continue; }
+      if (ch === '"') { inStr = true; continue; }
+      if (ch === open) depth++;
+      else if (ch === close) { depth--; if (!depth) return j; }
+    }
+    return -1;
+  }
+  /* 把一段文本拆成「普通文本」与「功能语句」两部分。
+     quote 引进来的是“一份文档”，里面的功能语句要照常跑：
+       {{…}}  执行语句        → 原样交给运行时执行
+       {$x$}  变量语句        → {{put:$x$}}
+       {`…`}  计算语句        → {{put:…}}
+     行内代码段里的这些东西不算语句。（{:…:} / {|…|} / {[…]} / {#…} 这些要编译期才能处理，
+     运行时没有对应实现，仍按原文显示。） */
+  function splitMbStatements(text) {
+    var parts = [], s = String(text), i = 0, n = s.length, buf = '';
+    function pushText() { if (buf) { parts.push({ text: buf }); buf = ''; } }
+    while (i < n) {
+      var c = s.charAt(i), e, k, e2, ve, ce, t, fence, e3;
+      if (c === '\\') { buf += s.substr(i, 2); i += 2; continue; }
+      if (c === '`') {                                  // 行内代码段：整段照抄
+        t = 0; while (s.charAt(i + t) === '`') t++;
+        fence = s.substr(i, t);
+        e3 = s.indexOf(fence, i + t);
+        if (e3 < 0) { buf += c; i++; continue; }
+        buf += s.slice(i, e3 + t); i = e3 + t; continue;
+      }
+      if (c !== '{') { buf += c; i++; continue; }
+      var stmt = null;
+      if (s.charAt(i + 1) === '{') {                    // {{a}{b}} / {{a}}{{b}}
+        e = mbBraceEnd(s, i, '{', '}');
+        if (e > 0) {
+          k = e + 1;
+          while (s.charAt(k) === '{') { e2 = mbBraceEnd(s, k, '{', '}'); if (e2 < 0) break; k = e2 + 1; }
+          stmt = s.slice(i, k);
+        }
+      } else if (s.charAt(i + 1) === '$') {              // {$name$}
+        ve = s.indexOf('$}', i + 2);
+        if (ve > 0 && /^[A-Za-z_][A-Za-z0-9_]*$/.test(s.slice(i + 2, ve))) {
+          stmt = '{{put:$' + s.slice(i + 2, ve) + '$}}'; k = ve + 2;
+        }
+      } else if (s.charAt(i + 1) === '`') {              // {`expr`}
+        ce = s.indexOf('`', i + 2);
+        if (ce > 0 && s.charAt(ce + 1) === '}') { stmt = '{{put:' + s.slice(i + 2, ce) + '}}'; k = ce + 2; }
+      }
+      if (stmt) { pushText(); parts.push({ stmt: stmt }); i = k; continue; }
+      buf += c; i++;
+    }
+    pushText();
+    return parts;
+  }
+  /* 把引用来的内容插到锚点后面：
+     文本部分按行内语法解析（换行变成 <br>），功能语句建成执行语句并当场执行。 */
+  function insertQuoted(anchor, text) {
+    if (!anchor || !anchor.parentNode) { LOG('quote：锚点已经不在页面里了'); return; }
+    var parent = anchor.parentNode, ref = anchor.nextSibling;
+    function put(node) { parent.insertBefore(node, ref); }
+    splitMbStatements(text).forEach(function (p) {
+      var i, t;
+      if (p.text) {
+        var segs = p.text.split('\n');
+        for (i = 0; i < segs.length; i++) {
+          if (i) put(document.createElement('br'));
+          if (!segs[i]) continue;
+          t = document.createTextNode(segs[i]);
+          put(t);
+          reparseText(t);
+        }
+      } else if (p.stmt) {
+        var span = document.createElement('span');
+        span.className = 'mb-exec';
+        span.setAttribute('data-mb', p.stmt);
+        put(span);
+        try { fire(span); } catch (e) { LOG('quote：里面的语句执行失败：' + e.message); }
+      }
+    });
+  }
 
   /* ---- 行内重解析：put / rplc 插进去的文本要当成 mb 文本再解析一遍 ----
      只做行内语法，而且【不】再执行 {{…}} / {$…$} / {`…`} 这类功能语句（免得重复执行）。 */
@@ -2125,13 +2728,18 @@ _(Commental)_
       else if ((cc === '/' || cc === '／') && slash < 0 && bar < 0) slash = j;
     }
     var i0 = bar >= 0 ? bar : slash, up = '', down = '';
-    if (i0 < 0) return '<ruby>' + mbEsc(inner) + '</ruby>';
+    if (i0 < 0) return null;                     // 没有 | / / → 不是 ruby（C.28）
     var base = inner.slice(0, i0), after = inner.slice(i0 + 1);
     if (bar >= 0) {
       var s2 = after.indexOf('/');
       if (s2 < 0) s2 = after.indexOf('／');
       if (s2 >= 0) { up = after.slice(0, s2); down = after.slice(s2 + 1); } else up = after;
     } else down = after;
+    if (!up && !down) {                          // 着重号：每个字符一组 ●（`|` 在上、`/` 在下）
+      var dh = '';
+      for (var dk = 0; dk < base.length; dk++) dh += mbEsc(base[dk]) + '<rp>(</rp><rt>●</rt><rp>)</rp>';
+      return '<ruby' + (bar < 0 ? ' class="mb-ruby-under"' : '') + '>' + dh + '</ruby>';
+    }
     var markU = '<rp>(</rp><rt>' + mbEsc(up) + '</rt><rp>)</rp>';
     var markD = '<rp>(</rp><rt>' + mbEsc(down) + '</rt><rp>)</rp>';
     if (up && down) {
@@ -2184,7 +2792,10 @@ _(Commental)_
         e = s.indexOf(t.c, i + t.o.length);
         if (e >= 0) {
           var inner2 = s.slice(i + t.o.length, e);
-          if (t.ruby) out += rubyLite(inner2);
+          if (t.ruby) {
+            var rl = rubyLite(inner2);        // null = 没写 | / /，不是 ruby
+            out += rl === null ? mbEsc(t.o) + mbInline(inner2) + mbEsc(t.c) : rl;
+          }
           else if (t.tag) out += '<' + t.tag + '>' + mbInline(inner2) + '</' + t.tag + '>';
           else out += '<span class="' + t.cls + '">' + mbInline(inner2) + '</span>';
           i = e + t.c.length; continue;
@@ -2292,6 +2903,19 @@ _(Commental)_
         var at = (name === 'call' && rec.anchor && rec.anchor.parentNode) ? rec.anchor : anchor;
         LOG(name + '：' + flag + '（执行 ' + rec.units.length + ' 条语句：' + rec.units.join(' / ') + '）');
         runUnits(rec.units, at, scope);
+        break;
+      }
+      case 'quote': {
+        // 引用其他 mbmd 文件：取回内容，按范围切出来，插在这个语句后面（再按行内语法解析一遍）
+        var qarg = String(val()), qs = splitQuoteArg(qarg);
+        LOG('quote：「' + qarg + '」');
+        if (typeof MB_cut !== 'function') { LOG('× quote：缺少 mb-range 块（MB_cut）'); break; }
+        fetchQuoteText(qs.url).then(function (txt) {
+          var piece = MB_cut(txt, qs.spec);
+          insertCompiled(anchor, piece);     // 用编译器整段解析（块级 + 行内 + 功能语句）
+        }).catch(function (e) {
+          LOG('× quote 取不到「' + qs.url + '」：' + e.message);
+        });
         break;
       }
       default: LOG('未知函数：' + name + '（语句：' + (arg === undefined ? name : name + ':' + arg) + '）');
@@ -2716,14 +3340,19 @@ _(Commental)_
     if (alt && !mediaEl.getAttribute('aria-label')) mediaEl.setAttribute('aria-label', alt);
     return made;
   }
-  /* 换成媒体元素时，把编译期写在 <img> 上的属性带过去（id / aria-label / role / title） */
+  /* 换成媒体元素时，把编译期写在 <img> 上的属性带过去：
+     id / role / title 只在目标没有时补上；aria-label【优先用用户写的】，
+     否则才用 buildMedia() 按替代文本填的那个兜底值 */
   function carryAttrs(from, to) {
-    ['id', 'aria-label', 'role', 'title'].forEach(function (k) {
+    ['id', 'role', 'title'].forEach(function (k) {
       var v = from.getAttribute(k);
-      if (!v || to.hasAttribute(k)) return;
-      if (k === 'aria-label') { var m = to.querySelector('video, audio'); (m || to).setAttribute(k, v); }
-      else to.setAttribute(k, v);
+      if (v && !to.hasAttribute(k)) to.setAttribute(k, v);
     });
+    var al = from.getAttribute('aria-label');
+    if (al) {
+      var m = to.querySelector ? to.querySelector('video, audio') : null;
+      (m || to).setAttribute('aria-label', al);
+    }
   }
   /* 取不到内容（跨域 / 本地文件）时的退路：拿一个 <video> 试读元数据——
      能读出画面尺寸就是视频，只有声音就是音频，读不出就还是按图片 */
@@ -2773,6 +3402,61 @@ _(Commental)_
     });
   }
 
+  /* ---------- 5. LaTeX 公式（标准 3.23）----------
+     转换器把公式源码写进 data-mb-tex；这里用 KaTeX 渲染。
+     没加载到 KaTeX（离线 / 被拦）时，元素里的公式源码就是可见的，不会变成空白。 */
+  function renderMath(root) {
+    var list = [];
+    if (root.nodeType === 1 && root.matches && root.matches('[data-mb-tex]')) list.push(root);
+    if (root.querySelectorAll) Array.prototype.push.apply(list, root.querySelectorAll('[data-mb-tex]'));
+    if (!list.length) return;
+    var tries = 0;
+    (function go() {
+      if (window.katex && window.katex.render) {
+        var ok = 0;
+        list.forEach(function (el) {
+          var tex = el.getAttribute('data-mb-tex') || '';
+          try {
+            katex.render(tex, el, { throwOnError: false, displayMode: !!el.getAttribute('data-mb-display') });
+            ok++;
+          } catch (e) { LOG('公式渲染失败：' + e.message + '（' + tex + '）'); }
+        });
+        LOG('公式：渲染了 ' + ok + ' 处（KaTeX）');
+      } else if (tries++ < 25) {
+        setTimeout(go, 200);
+      } else {
+        LOG('公式：没加载到 KaTeX（离线？），按原文显示');
+      }
+    })();
+  }
+
+  /* 引用来的内容用【编译器】整段解析成 HTML 再插进来——标题、引用、表格、列表、
+     折叠块、按钮、输入框、图表、脚注、checkbox、竖排、原始文本、LaTeX 公式、
+     各种功能语句……全都照常解析；然后把新插进来的一片接上运行时。
+     页面里没有编译器（window.mbCompile）时退回 insertQuoted()（只解析行内 + 三类语句）。 */
+  function insertCompiled(anchor, text) {
+    if (!anchor || !anchor.parentNode) { LOG('quote：锚点已经不在页面里了'); return; }
+    if (typeof window.mbCompile !== 'function') {
+      LOG('quote：这个页面里没有编译器（window.mbCompile），退回行内方式插入');
+      insertQuoted(anchor, text);
+      return;
+    }
+    var html;
+    try { html = window.mbCompile(text); }
+    catch (e) { LOG('× quote：解析引用来的内容失败（' + e.message + '），退回行内方式'); insertQuoted(anchor, text); return; }
+    var host = document.createElement('div');
+    host.innerHTML = html;
+    /* 这条语句若是“单独成行”的，外面只包了一个 <p>：把它换掉，免得把块级元素塞进段落里 */
+    var wrapper = null, pe = anchor.parentNode;
+    if (pe && pe.tagName === 'P' && !pe.textContent.trim() && !pe.querySelector('*:not(.mb-exec)')) wrapper = pe;
+    var parent = (wrapper || anchor).parentNode, ref = (wrapper || anchor).nextSibling;
+    var added = [], nd, lines = text.split('\n').length;
+    while ((nd = host.firstChild)) { parent.insertBefore(nd, ref); added.push(nd); }
+    if (wrapper && wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
+    added.forEach(function (n) { if (n.nodeType === 1) initIn(n); });
+    LOG('quote：插入了 ' + lines + ' 行（已按 mb 整段解析）');
+  }
+
   function scopeOf(el) {
     if (el.matches && el.matches('input, textarea, select')) DOC_SCOPE.cntnt = el.value;
     else DOC_SCOPE.cntnt = el.textContent;
@@ -2783,42 +3467,61 @@ _(Commental)_
     tick();
     runScript(el.dataset.mb, el, scopeOf(el));
   }
+  /* 把一个元素（含它的后代）接上运行时：单独成行的执行语句、按钮、输入控件、折叠块、媒体、公式。
+     用 _mbWired 标记，避免同一处接两遍（插入内容之后会再调一次）。 */
+  function initIn(node) {
+    if (!node) return;
+    var list = [];
+    if (node.nodeType === 1) list.push(node);
+    if (node.querySelectorAll) Array.prototype.push.apply(list, node.querySelectorAll('*'));
+    list.forEach(function (el) {
+      if (!el.matches || el._mbWired) return;
+      if (el.matches('.mb-exec[data-mb]')) { el._mbWired = true; fire(el); return; }
+      if (el.matches('button[data-mb], a.mb-btn[data-mb]')) {
+        el._mbWired = true;
+        el.addEventListener('click', function (e) { e.preventDefault(); fire(el); });
+        return;
+      }
+      if (el.matches('input[data-mb], textarea[data-mb], select[data-mb]')) {
+        el._mbWired = true;
+        el.addEventListener('change', function () { fire(el); });
+        return;
+      }
+      if (el.matches('[data-mb-enter]')) {
+        el._mbWired = true;
+        el.addEventListener('keydown', function (e) {
+          if (e.key !== 'Enter') return;
+          var btn = document.querySelector(el.dataset.mbEnter);
+          if (btn) btn.click();
+        });
+        return;
+      }
+      if (el.matches('img[data-mb-media]')) { el._mbWired = true; resolveMedia(el); return; }
+      if (el.matches('.mb-fold-state[data-mb-rows]')) {
+        el._mbWired = true;
+        (function () {
+          var rows = document.querySelectorAll('[data-mb-fold="' + el.id + '"]');
+          function apply() {
+            rows.forEach(function (r) {
+              r.classList.toggle('mb-fold-off', !el.checked);
+              r.removeAttribute('hidden');
+            });
+          }
+          apply();
+          el.addEventListener('change', apply);
+        })();
+        return;
+      }
+    });
+    renderMath(node);                 // LaTeX 公式（含 node 自己）
+  }
   function init(root) {
-    root = root || document;
-    root.querySelectorAll('.mb-exec[data-mb]').forEach(fire);
-    root.querySelectorAll('button[data-mb], a.mb-btn[data-mb]').forEach(function (el) {
-      el.addEventListener('click', function (e) { e.preventDefault(); fire(el); });
-    });
-    root.querySelectorAll('input[data-mb], textarea[data-mb], select[data-mb]').forEach(function (el) {
-      el.addEventListener('change', function () { fire(el); });
-    });
-    root.querySelectorAll('[data-mb-enter]').forEach(function (el) {
-      el.addEventListener('keydown', function (e) {
-        if (e.key !== 'Enter') return;
-        var btn = document.querySelector(el.dataset.mbEnter);
-        if (btn) btn.click();
-      });
-    });
+    initIn(root || document);
     // 表格里的折叠块：切换被折叠的行。
     // 注意：这里【不能】用 hidden / display:none 去藏行——被藏起来的行不再占位，
     // 跨行的 rowspan 就会把后面的行整片挤歪。做法是让行留在表格里，只换一个类名
     // （.mb-fold-off，由 CSS 把那一行的内容与内边距收掉）。
-    root.querySelectorAll('.mb-fold-state[data-mb-rows]').forEach(function (el) {
-      var rows = document.querySelectorAll('[data-mb-fold="' + el.id + '"]');
-      function apply() {
-        rows.forEach(function (r) {
-          r.classList.toggle('mb-fold-off', !el.checked);
-          r.removeAttribute('hidden');
-        });
-      }
-      apply();
-      el.addEventListener('change', apply);
-    });
-    // 图片 / 视频 / 音频：编译出来的是 <img src alt data-mb-media="…">，
-    // 这里按文件内容判断它到底是图片、视频还是音频（音频还要抠内嵌封面）
-    if (root.querySelectorAll) {
-      root.querySelectorAll('img[data-mb-media]').forEach(resolveMedia);
-    }
+    // 媒体（图片 / 视频 / 音频）也在 initIn() 里接
     // trigger 排在后面、call / use 先跑到的情况：这里补跑一次
     PENDING.splice(0).forEach(function (p) {
       var rec = TRIGGERS[p.flag];
@@ -2832,7 +3535,1854 @@ _(Commental)_
     document.addEventListener('DOMContentLoaded', function () { init(); });
   } else { init(); }
   window.mb = { init: init, evaluate: evaluate, run: runScript, vars: GLOBAL,
-                log: MB_LOG, triggers: TRIGGERS, media: resolveMedia };
+                log: MB_LOG, triggers: TRIGGERS, media: resolveMedia, math: renderMath };
+})();
+</script>
+<script>
+(function () {
+
+
+/* ==================================================================
+   0. 工具
+   ================================================================== */
+var warnings = [];
+function warn(msg) { if (warnings.indexOf(msg) < 0) warnings.push(msg); }
+/* 引用范围（quote 的 `[…]`）：与生成的文档里那份是同一段代码（见上面的 mb-range 块）。
+   转换器里读那个块来加载；生成的文档里没有这个元素——那时直接用运行时先建立好的全局 MB_cut */
+var MB_cut = (function () {
+  var el = document.getElementById('mbRange');
+  if (el) return (new Function(el.textContent + '\nreturn MB_cut;'))();
+  if (typeof window.MB_cut === 'function') return window.MB_cut;
+  return function (t) { return String(t == null ? '' : t); };
+})();
+var QUOTE_LOG = [];
+if (document.getElementById('mbRange')) {
+  window.mbRangeWarn = function (s) { if (QUOTE_LOG.indexOf('⚠ ' + s) < 0) QUOTE_LOG.push('⚠ ' + s); };
+}
+var ESCMAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return ESCMAP[c]; }); }
+var UID = 0;
+function uid(p) { UID++; return (p || 'mb') + '-' + UID; }
+/* 分离式折叠块：把用户写的标识符映射成合法的 HTML id */
+function foldId(name) { return 'mbd-' + String(name).trim().replace(/[^\w-]/g, '_'); }
+
+/* ---- 分离式折叠块 ----
+   按钮：  ~[标题]~>[标识符]
+   内容：  [标识符]~>[  ……内容（可以跨行）……  ]
+   开头的 ~ 和两处方括号都是必需的，一个都不能省。
+   宽容处理：`~` 也允许写成全角 `～`、`>` 写成 `＞`；方括号内首尾的空格不计入标识符。
+   标识符由按钮声明，先扫一遍全文把它们收集起来。 */
+var FOLD_BTN_SRC = '[~～]\\[([^\\]\\n]+?)\\]\\s*[~～]\\s*[>＞]\\s*\\[([^\\]\\n]+?)\\]';
+var RE_FOLD_BTN   = new RegExp('^' + FOLD_BTN_SRC);   // 行内：锚定在当前位置
+var RE_FOLD_HEAD  = /^\s*\[([^\]\n]+?)\]\s*[~～]\s*[>＞]\s*\[(.*)$/;
+var FOLD_IDS = Object.create(null);
+function collectFoldIds(src) {
+  FOLD_IDS = Object.create(null);
+  var re = new RegExp(FOLD_BTN_SRC, 'g'), m;
+  while ((m = re.exec(src))) FOLD_IDS[m[2].trim()] = true;
+}
+/* 该行是不是“分离式折叠块的内容区”开头？是则返回 [整行, 标识符, `[` 之后的剩余文本]
+   loose = true 时不再要求“这个标识符有对应的按钮”（表格 / 列表里用，免得把结构切断） */
+function isFoldContentStart(line, loose) {
+  var m = RE_FOLD_HEAD.exec(line);
+  if (!m) return null;
+  m[1] = m[1].trim();
+  if (!loose && !FOLD_IDS[m[1]]) return null;
+  return m;
+}
+/* 读取内容区：从第 j 行、`[` 之后的 tail 开始，按方括号配对找到收尾的 `]` */
+function readFoldContent(lines, j, tail) {
+  var buf = [], depth = 0, out = '', k;
+  function scan(s) {
+    for (var q = 0; q < s.length; q++) {
+      var ch = s[q];
+      if (ch === '\\') { out += (s[q + 1] || ''); q++; continue; }
+      if (ch === '[') { depth++; out += ch; continue; }
+      if (ch === ']') {
+        if (depth === 0) return true;              // 收尾
+        depth--; out += ch; continue;
+      }
+      out += ch;
+    }
+    return false;
+  }
+  if (scan(tail || '')) {
+    if (out !== '') buf.push(out);
+    return { lines: buf, next: j + 1, ok: true };
+  }
+  if (out !== '') buf.push(out);
+  out = '';
+  k = j + 1;
+  while (k < lines.length) {
+    if (scan(lines[k])) {
+      if (out !== '') buf.push(out);
+      return { lines: buf, next: k + 1, ok: true };
+    }
+    buf.push(out); out = ''; k++;
+  }
+  return { lines: buf, next: k, ok: false };      // 少了收尾的 ] → 未闭合
+}
+/* {#id.class} → id/class 属性 */
+function nameAttrs(s) {
+  var id = '', cls = [], re = /([#.])([A-Za-z_][\w-]*)/g, m;
+  while ((m = re.exec(s))) { if (m[1] === '#') id = m[2]; else cls.push(m[2]); }
+  return (id ? ' id="' + esc(id) + '"' : '') + (cls.length ? ' class="' + esc(cls.join(' ')) + '"' : '');
+}
+/* 把属性注入某个块的第一个开标签 */
+function injectAttrs(html, name) { return injectAttrsRaw(html, nameAttrs(name)); }
+function injectAttrsRaw(html, attrStr) {
+  if (!attrStr) return html;
+  return html.replace(/^(\s*<[a-zA-Z][\w-]*)/, '$1' + attrStr);
+}
+/* 命名语句写在元素【后面】（标准 3.1）：`out` 的末尾如果正好是一个刚结束的元素，
+   就返回“属性该插在哪个下标”（开标签里、标签名之后），否则返回 null（说明前面只是普通文字，
+   这时把名字交给所在的块）。 */
+function trailingElement(out) {
+  var m = /<\/([a-zA-Z][\w-]*)>$/.exec(out), tag, ids = [], re, r, depth = 0, k;
+  if (m) {
+    tag = m[1];
+    re = new RegExp('</?' + tag + '(?=[\\s>/])', 'g');
+    while ((r = re.exec(out))) ids.push({ i: r.index, close: out.charAt(r.index + 1) === '/' });
+    for (k = ids.length - 1; k >= 0; k--) {
+      if (ids[k].close) depth++;
+      else { depth--; if (!depth) return ids[k].i + 1 + tag.length; }
+    }
+    return null;
+  }
+  m = /<(img|input|br|hr|source|video|audio|embed|track)(\s[^<>]*)?\/?>$/.exec(out);
+  if (m) return out.length - m[0].length + 1 + m[1].length;
+  return null;
+}
+function injectAttrsAt(html, pos, attrStr) {
+  return attrStr ? html.slice(0, pos) + attrStr + html.slice(pos) : html;
+}
+/* 若干条命名语句合起来（`{#t1}{.c1.c2}` → ` id="t1" class="c1 c2"`） */
+function namesAttrs(list) {
+  var id = '', cls = [], re = /([#.])([A-Za-z_][\w-]*)/g, m, i;
+  for (i = 0; i < list.length; i++) {
+    re.lastIndex = 0;
+    while ((m = re.exec(list[i]))) { if (m[1] === '#') id = m[2]; else cls.push(m[2]); }
+  }
+  return (id ? ' id="' + esc(id) + '"' : '') + (cls.length ? ' class="' + esc(cls.join(' ')) + '"' : '');
+}
+
+/* ==================================================================
+   1. 表达式求值（与标准附录 A 的参考运行时一致）
+   ================================================================== */
+var GLOBALV = Object.create(null);
+function tickClock() {
+  var d = new Date();
+  function p(n) { return String(n).padStart(2, '0'); }
+  GLOBALV.timeh = p(d.getHours());  GLOBALV.timem = p(d.getMinutes());
+  GLOBALV.times = p(d.getSeconds());
+  GLOBALV.timeY = String(d.getFullYear());
+  GLOBALV.timeM = p(d.getMonth() + 1); GLOBALV.timeD = p(d.getDate());
+}
+tickClock();
+GLOBALV.browser = (typeof navigator !== 'undefined' ? navigator.userAgent : '');
+GLOBALV.os = (typeof navigator !== 'undefined' ? (navigator.platform || '') : '');
+
+var TOKEN_RE = new RegExp(
+  '\\s*(' +
+    '\\d+(?:\\.\\d+)?' +
+    '|"(?:[^"\\\\]|\\\\.)*"' +
+    '|\\$[A-Za-z_][A-Za-z0-9_]*\\$' +
+    '|\\+:|\\-:|%:|>:' +
+    '|\\+\\+|--|\\+=|-=|\\*=|\/=' +
+    '|>=|<=|==|!=' +
+    '|\\.-|\\.\\+|\\.\\?' +
+    '|[+\\-*/%()\\[\\],=!|&<>?:]' +
+  ')', 'y');
+
+function tokenize(src) {
+  var out = [], i = 0, m;
+  while (i < src.length) {
+    if (/\s/.test(src[i])) { i++; continue; }
+    TOKEN_RE.lastIndex = i;
+    m = TOKEN_RE.exec(src);
+    if (!m) throw new SyntaxError('非法字符：' + src[i]);
+    out.push(m[1]); i = TOKEN_RE.lastIndex;
+  }
+  return out;
+}
+function truthy(v) {
+  return !(v === '' || v === 0 || v === '0' || v === false || v === null || v === undefined);
+}
+function evalExpr(src, scope) {
+  scope = scope || Object.create(null);
+  var toks = tokenize(src), p = 0;
+  function peek() { return toks[p]; }
+  function eat(t) { if (toks[p] === t) { p++; return true; } return false; }
+  function expect(t) { if (!eat(t)) throw new SyntaxError('期望 “' + t + '”，实为 “' + toks[p] + '”'); }
+  function getVar(n) {
+    if (n === 'cntnt') return scope.cntnt === undefined ? '' : scope.cntnt;
+    if (n in scope) return scope[n];
+    if (n in GLOBALV) return GLOBALV[n];
+    return '';
+  }
+  function setVar(n, v) { if (n === 'cntnt') scope.cntnt = v; else scope[n] = v; return v; }
+  function conditional() {
+    var c = assignment();
+    if (eat('?')) { var a = conditional(); expect(':'); var b = conditional(); return truthy(c) ? a : b; }
+    return c;
+  }
+  function assignment() {
+    var t = peek();
+    if (t && t.charAt(0) === '$') {
+      var name = t.slice(1, -1), op = toks[p + 1];
+      if (op === '=' || op === '+=' || op === '-=' || op === '*=' || op === '/=') {
+        p += 2;
+        var old = getVar(name), rhs = assignment();
+        if (op === '=')  return setVar(name, rhs);
+        if (op === '+=') return setVar(name, Number(old) + Number(rhs));
+        if (op === '-=') return setVar(name, Number(old) - Number(rhs));
+        if (op === '*=') return setVar(name, Number(old) * Number(rhs));
+        return setVar(name, Number(old) / Number(rhs));
+      }
+      if (op === '++' || op === '--') {
+        p += 2; var v0 = Number(getVar(name));
+        setVar(name, op === '++' ? v0 + 1 : v0 - 1); return v0;
+      }
+    }
+    return or();
+  }
+  function or()  { var v = and(); while (eat('|')) { var r = and(); v = truthy(v) || truthy(r); } return v; }
+  function and() { var v = equ(); while (eat('&')) { var r = equ(); v = truthy(v) && truthy(r); } return v; }
+  function equ() {
+    var v = rel();
+    for (;;) { if (eat('==')) v = (v == rel()); else if (eat('!=')) v = (v != rel()); else return v; }
+  }
+  function rel() {
+    var v = strOps();
+    for (;;) {
+      if (eat('>=')) v = (v >= strOps());
+      else if (eat('<=')) v = (v <= strOps());
+      else if (eat('>')) v = (v > strOps());
+      else if (eat('<')) v = (v < strOps());
+      else return v;
+    }
+  }
+  function strOps() {
+    var v = add();
+    for (;;) {
+      if (eat('+:')) { v = String(v) + String(add()); }
+      else if (eat('-:')) { v = String(v).split(String(add())).join(''); }
+      else if (eat('%:')) {
+        var oldS = add();
+        if (!eat('>:')) throw new SyntaxError('“%:” 必须与 “>:” 配对');
+        v = String(v).split(String(oldS)).join(String(add()));
+      } else return v;
+    }
+  }
+  function add() {
+    var v = mul();
+    for (;;) {
+      if (eat('+')) v = Number(v) + Number(mul());
+      else if (eat('-')) v = Number(v) - Number(mul());
+      else return v;
+    }
+  }
+  function mul() {
+    var v = unary();
+    for (;;) {
+      if (eat('*')) v = Number(v) * Number(unary());
+      else if (eat('/')) v = Number(v) / Number(unary());
+      else if (eat('%')) v = Number(v) % Number(unary());
+      else return v;
+    }
+  }
+  function unary() {
+    if (eat('!')) return !truthy(unary());
+    if (eat('-')) return -Number(unary());
+    if (eat('+')) return Number(unary());
+    return postfix();
+  }
+  function postfix() {
+    var v = primary();
+    for (;;) {
+      if (eat('[')) { var n = conditional(); expect(']'); v = String(v).charAt(Number(n) - 1); }
+      else if (eat('.-')) v = Math.floor(Number(v));
+      else if (eat('.+')) v = Math.ceil(Number(v));
+      else if (eat('.?')) v = Math.round(Number(v));
+      else return v;
+    }
+  }
+  function primary() {
+    var t = peek();
+    if (t === undefined) throw new SyntaxError('表达式意外结束');
+    if (/^\d/.test(t)) { p++; return parseFloat(t); }
+    if (t.charAt(0) === '"') { p++; return JSON.parse(t); }
+    if (t.charAt(0) === '$') { p++; return getVar(t.slice(1, -1)); }
+    if (eat('(')) { var v = conditional(); expect(')'); return v; }
+    throw new SyntaxError('无法解析：“' + t + '”');
+  }
+  var value = conditional();
+  if (p !== toks.length) throw new SyntaxError('表达式未完全解析');
+  return value;
+}
+function calc(expr) {
+  try { return evalExpr(expr, Object.create(null)); }
+  catch (e) { warn('计算失败：' + expr + '（' + e.message + '）'); return ''; }
+}
+
+/* ==================================================================
+   2. 内容语句
+   ================================================================== */
+var GREEK = {
+  alpha:'α', beta:'β', gamma:'γ', delta:'δ', epsilon:'ε', zeta:'ζ', eta:'η', theta:'θ',
+  iota:'ι', kappa:'κ', lambda:'λ', mu:'μ', nu:'ν', xi:'ξ', omicron:'ο', pi:'π', rho:'ρ',
+  sigma:'σ', tau:'τ', upsilon:'υ', phi:'φ', chi:'χ', psi:'ψ', omega:'ω',
+  Alpha:'Α', Beta:'Β', Gamma:'Γ', Delta:'Δ', Epsilon:'Ε', Zeta:'Ζ', Eta:'Η', Theta:'Θ',
+  Iota:'Ι', Kappa:'Κ', Lambda:'Λ', Mu:'Μ', Nu:'Ν', Xi:'Ξ', Omicron:'Ο', Pi:'Π', Rho:'Ρ',
+  Sigma:'Σ', Tau:'Τ', Upsilon:'Υ', Phi:'Φ', Chi:'Χ', Psi:'Ψ', Omega:'Ω'
+};
+var EMOJI = {
+  smile:'😄', grin:'😁', joy:'😂', heart:'❤️', thumbsup:'👍', thumbsdown:'👎', ok:'👌',
+  cry:'😢', sob:'😭', wink:'😉', thinking:'🤔', fire:'🔥', star:'⭐', check:'✅',
+  cross:'❌', warning:'⚠️', question:'❓', exclamation:'❗', tada:'🎉', rocket:'🚀'
+};
+var CONTROL = {
+  nbsp:'&nbsp;', copy:'&copy;', reg:'&reg;', trade:'&trade;', hellip:'&hellip;',
+  mdash:'&mdash;', ndash:'&ndash;', laquo:'&laquo;', raquo:'&raquo;',
+  lsquo:'&lsquo;', rsquo:'&rsquo;', ldquo:'&ldquo;', rdquo:'&rdquo;',
+  times:'&times;', divide:'&divide;', plusmn:'&plusmn;', deg:'&deg;',
+  larr:'&larr;', rarr:'&rarr;', uarr:'&uarr;', darr:'&darr;', harr:'&harr;',
+  infin:'&infin;', ne:'&ne;', le:'&le;', ge:'&ge;', middot:'&middot;', bull:'&bull;'
+};
+function contentStatement(cat, name) {
+  cat = cat.trim(); name = name.trim();
+  if (cat === 'greek') {
+    if (GREEK[name]) return GREEK[name];
+    warn('未知的希腊字母：' + name);
+  } else if (cat === 'emoji' || cat === 'icon') {
+    var key = name.split(':')[0];
+    if (EMOJI[key]) return EMOJI[key];
+    warn('未知的 ' + cat + '：' + name);
+  } else if (cat === 'control') {
+    if (CONTROL[name]) return CONTROL[name];
+    warn('未知的控制字符：' + name);
+  } else if (cat === 'unicode') {
+    var cp = parseInt(name, 16);
+    if (!isNaN(cp)) return String.fromCodePoint(cp);
+    warn('非法码位：' + name);
+  } else {
+    warn('未知的内容语句分类：' + cat);
+  }
+  return '{:' + cat + ':' + name + ':}';
+}
+
+/* ==================================================================
+   3. 行内解析
+   ================================================================== */
+
+/* 找配对的结束定界符；返回其下标，找不到返回 -1 */
+function findClose(src, from, open, close) {
+  var depth = 1, i = from, n = src.length;
+  while (i < n) {
+    var c = src[i];
+    if (c === '\\') { i += 2; continue; }
+    if (c === '`') { var e = src.indexOf('`', i + 1); i = e < 0 ? n : e + 1; continue; }
+    if (src.startsWith(open, i)) { depth++; i += open.length; continue; }
+    if (src.startsWith(close, i)) { depth--; if (!depth) return i; i += close.length; continue; }
+    i++;
+  }
+  return -1;
+}
+/* 取一对定界符之间的内容 */
+function pair(src, i, open, close) {
+  if (!src.startsWith(open, i)) return null;
+  var c = findClose(src, i + open.length, open, close);
+  if (c < 0) return null;
+  return { inner: src.slice(i + open.length, c), end: c + close.length };
+}
+/* 找下一个同样的定界符（** __ ~~ 这类对称定界符用） */
+function findSame(src, from, mark) {
+  var i = from;
+  while (i <= src.length - mark.length) {
+    if (src[i] === '\\') { i += 2; continue; }
+    if (src.startsWith(mark, i)) return i;
+    i++;
+  }
+  return -1;
+}
+/* 找结束定界符，但先略过 skip 次（解析语句 {/`=n} 的语义） */
+function findFenceEnd(src, from, fence, skip) {
+  var idx = from;
+  for (;;) {
+    var e = src.indexOf(fence, idx);
+    if (e < 0) return -1;
+    if (skip > 0) { skip--; idx = e + fence.length; continue; }
+    return e;
+  }
+}
+/* 扫描一个大括号块，返回匹配 } 的下标 */
+function braceEnd(src, i) {
+  var depth = 0, inStr = false, n = src.length;
+  for (var j = i; j < n; j++) {
+    var c = src[j];
+    if (inStr) { if (c === '\\') j++; else if (c === '"') inStr = false; continue; }
+    if (c === '"') { inStr = true; continue; }
+    if (c === '{') depth++;
+    else if (c === '}') { depth--; if (!depth) return j; }
+  }
+  return -1;
+}
+function colorSpan(cls, inner) {
+  // 颜色一律由 CSS 变量 --mbhighlightcolor / --mbhighlightbgcolor 决定；
+  // 语法层面【不支持】自己指定颜色（C.22 取消了这条功能），定界符里一律按原样文字处理
+  return '<span class="' + cls + '">' + inline(inner) + '</span>';
+}
+
+/* 把触发器文字里的计算语句 {`expr`} 挑出来：触发器里它只算不输出（见 3.9.7） */
+function extractCalcs(text) {
+  var script = '';
+  var clean = String(text).replace(/\{`([^`\n]*)`\}/g, function (m, expr) {
+    script += '{{calc:' + expr + '}}';
+    return '';
+  });
+  return { text: clean, script: script };
+}
+/* ---- 可交互元素：在位置 i 尝试解析一个元素，返回 {html,end} 或 null ---- */
+function parseElementAt(src, i, ctx) {
+  // 多行输入框 [:[placeholder](默认内容){{...}}]
+  if (src.startsWith('[:', i)) {
+    var e1 = findClose(src, i + 2, '[', ']');
+    if (e1 > 0) {
+      var body = src.slice(i + 2, e1), sc1 = '';
+      var m1 = /\{\{[\s\S]*?\}\}\s*$/.exec(body);
+      if (m1) { sc1 = m1[0].trim(); body = body.slice(0, m1.index); }
+      var pm = /^\s*\[([^\]]*)\]\s*(?:\(([^)]*)\))?\s*$/.exec(body);
+      return { html: textareaHtml(pm ? pm[1] : '', pm && pm[2] ? pm[2] : '', sc1), end: e1 + 1 };
+    }
+  }
+  // 选择框 [;[占位][选项1][选项2](默认){{...}}]
+  if (src.startsWith('[;', i)) {
+    var e2 = findClose(src, i + 2, '[', ']');
+    if (e2 > 0) {
+      var b2 = src.slice(i + 2, e2), sc2 = '';
+      var m2 = /\{\{[\s\S]*?\}\}\s*$/.exec(b2);
+      if (m2) { sc2 = m2[0].trim(); b2 = b2.slice(0, m2.index); }
+      var opts = [], mm, re2 = /\[([^\]]*)\]/g;
+      while ((mm = re2.exec(b2))) opts.push(mm[1]);
+      var dm = /\(([^)]*)\)/.exec(b2);
+      return { html: selectHtml(opts, dm ? dm[1] : '', sc2), end: e2 + 1 };
+    }
+  }
+  // 输入框 :[placeholder](默认内容)->(#id){{...}}
+  if (src.startsWith(':[', i)) {
+    var e3 = findClose(src, i + 2, '[', ']');
+    if (e3 > 0) {
+      var ph3 = src.slice(i + 2, e3), k = e3 + 1, val3 = '', enter = '', sc3 = '';
+      if (src[k] === '(') { var c3 = src.indexOf(')', k); if (c3 > 0) { val3 = src.slice(k + 1, c3); k = c3 + 1; } }
+      if (src.startsWith('->(', k)) { var c4 = src.indexOf(')', k + 3); if (c4 > 0) { enter = src.slice(k + 4, c4); k = c4 + 1; } }
+      while (src.startsWith('{{', k)) {
+        var c5 = braceEnd(src, k);
+        if (c5 < 0) break;
+        sc3 += src.slice(k, c5 + 1); k = c5 + 1;
+      }
+      return { html: inputHtml(ph3, val3, enter, sc3), end: k };
+    }
+  }
+  // 按钮 / 按钮式连接：[[显示文字](地址)] 或 [[显示文字]{{执行语句}}]
+  if (src.startsWith('[[', i)) {
+    var rc = /^[^\]\\]*/.exec(src.slice(i + 2));
+    var e4 = i + 2 + rc[0].length;
+    if (src[e4] === ']') {
+      var text = src.slice(i + 2, e4), k4 = e4 + 1, url4 = '', sc4 = '';
+      if (src[k4] === '(') { var c6 = src.indexOf(')', k4); if (c6 > 0) { url4 = src.slice(k4 + 1, c6); k4 = c6 + 1; } }
+      while (src.startsWith('{{', k4)) {
+        var c7 = braceEnd(src, k4);
+        if (c7 < 0) break;
+        sc4 += src.slice(k4, c7 + 1); k4 = c7 + 1;
+      }
+      if (src[k4] === ']') {
+        k4++;
+        if (url4 && !sc4) {
+          return { html: '<a class="mb-btn" href="' + esc(url4) + '">' + inline(text) + '</a>', end: k4 };
+        }
+        var ex4 = extractCalcs(text);
+        return { html: buttonHtml(ex4.text, sc4 + ex4.script), end: k4 };
+      }
+    }
+  }
+  // 任务列表的 checkbox（行内形式）
+  if (src.startsWith('[ ]', i) || src.startsWith('[x]', i) || src.startsWith('[X]', i)) {
+    var on = src[i + 1] !== ' ';
+    return { html: '<input type="checkbox" disabled' + (on ? ' checked' : '') + '>', end: i + 3 };
+  }
+  return null;
+}
+function inputHtml(ph, val, enter, script) {
+  var a = ' type="text" class="mb-input"';
+  if (ph) a += ' placeholder="' + esc(ph) + '"';
+  if (val) a += ' value="' + esc(val) + '"';
+  if (enter) a += ' data-mb-enter="#' + esc(enter.replace(/^#/, '')) + '"';
+  if (script) a += ' data-mb="' + esc(script) + '"';
+  return '<input' + a + '>';
+}
+function textareaHtml(ph, val, script) {
+  var a = ' class="mb-input"';
+  if (ph) a += ' placeholder="' + esc(ph) + '"';
+  if (script) a += ' data-mb="' + esc(script) + '"';
+  return '<textarea' + a + '>' + esc(val) + '</textarea>';
+}
+function selectHtml(opts, def, script) {
+  var h = '<select class="mb-input"' + (script ? ' data-mb="' + esc(script) + '"' : '') + '>';
+  if (opts.length) h += '<option value="" disabled hidden>' + esc(opts[0]) + '</option>';
+  for (var i = 1; i < opts.length; i++) {
+    var o = opts[i], v = o, t = o, eq = o.indexOf('=');
+    if (eq >= 0) { t = o.slice(0, eq); v = o.slice(eq + 1); }
+    h += '<option value="' + esc(v) + '"' + (def && t === def ? ' selected' : '') + '>' + esc(t) + '</option>';
+  }
+  return h + '</select>';
+}
+function buttonHtml(label, script) {
+  return '<button type="button" class="mb-btn"' + (script ? ' data-mb="' + esc(script) + '"' : '')
+       + '>' + inline(label) + '</button>';
+}
+
+/* ---- 执行语句 / 计算语句 / 变量 ---- */
+function execStatement(inner, scope) {
+  // inner = `{fn:arg}` 的串接（不含最外层大括号）
+  var anchorId = uid('exec');
+  return '<span class="mb-exec" id="' + anchorId + '" data-mb="{{' + esc(inner) + '}}"></span>';
+}
+function calcStatement(expr) {
+  if (expr.indexOf('$') < 0) {                       // 无变量 → 编译期直接算出来
+    try { return esc(String(evalExpr(expr, Object.create(null)))); } catch (e) { /* 落回运行时 */ }
+  }
+  return '<span class="mb-exec" data-mb="{{put:' + esc(expr) + '}}"></span>';
+}
+function varStatement(name) {
+  return '<span class="mb-exec" data-mb="{{put:$' + esc(name) + '$}}"></span>';
+}
+/* ---- LaTeX 公式（见标准 3.23）----
+   编译时把公式源码放进 data-mb-tex，渲染交给运行时（参考实现用 KaTeX）；
+   没加载到渲染器时，元素里的原文就是可见的公式源码，不会消失 */
+function mathInline(tex) {
+  return '<span class="mb-math" data-mb-tex="' + esc(tex) + '">' + esc(tex) + '</span>';
+}
+function mathBlock(tex) {
+  return '<div class="mb-math-block" data-mb-tex="' + esc(tex) + '" data-mb-display="1">'
+       + esc(tex) + '</div>\n';
+}
+
+/* ---- ruby ---- */
+function rubyHtml(base, up, down, under) {
+  function mark(t) {
+    return '<rp>(</rp><rt>' + t + '</rt><rp>)</rp>';
+  }
+  function dots(s) {
+    var h = '';
+    for (var i = 0; i < s.length; i++) h += esc(s[i]) + '<rp>(</rp><rt>●</rt><rp>)</rp>';
+    return h;
+  }
+  var baseHtml = base.indexOf('【') >= 0 ? inline(base) : esc(base);
+  var upHtml = up ? (up.indexOf('【') >= 0 ? inline(up) : esc(up)) : '';
+  var downHtml = down ? esc(down) : '';
+  var needDots = !up && !down;
+  if (needDots) {                       // 着重号：每个字符各自一组；/ 型要标在下方
+    var h = '';
+    for (var i = 0; i < base.length; i++) h += esc(base[i]) + '<rp>(</rp><rt>●</rt><rp>)</rp>';
+    return '<ruby' + (under ? ' class="mb-ruby-under"' : '') + '>' + h + '</ruby>';
+  }
+  if (up && down) {                     // 上下都有：外层 ruby 走 under，内层显式压回 over
+    return '<ruby class="mb-ruby-under"><ruby class="mb-ruby-over">' + baseHtml + mark(upHtml)
+         + '</ruby><rp>(</rp><rt>' + downHtml + '</rt><rp>)</rp></ruby>';
+  }
+  if (down) {
+    return '<ruby class="mb-ruby-under">' + baseHtml + '<rp>(</rp><rt>' + downHtml + '</rt><rp>)</rp></ruby>';
+  }
+  return '<ruby>' + baseHtml + '<rp>(</rp><rt>' + upHtml + '</rt><rp>)</rp></ruby>';
+}
+function parseRuby(inner) {
+  var bar = -1, slash = -1, depth = 0, i;
+  for (i = 0; i < inner.length; i++) {
+    var c = inner[i];
+    if (c === '【') { depth++; continue; }
+    if (c === '】') { depth--; continue; }
+    if (depth > 0) continue;
+    if ((c === '|' || c === '｜') && bar < 0 && slash < 0) bar = i;
+    else if ((c === '/' || c === '／') && slash < 0 && bar < 0) slash = i;
+  }
+  if (bar < 0 && slash < 0) return null;    // 没有 | / / → 不是 ruby（C.28）：按普通文本输出
+  var isBar = bar >= 0, i0 = isBar ? bar : slash;
+  var base = inner.slice(0, i0), after = inner.slice(i0 + 1), up = '', down = '';
+  if (isBar) {
+    var s2 = -1, d2 = 0;
+    for (var j = 0; j < after.length; j++) {
+      var c2 = after[j];
+      if (c2 === '【') { d2++; continue; }
+      if (c2 === '】') { d2--; continue; }
+      if (d2 === 0 && (c2 === '/' || c2 === '／')) { s2 = j; break; }
+    }
+    if (s2 >= 0) { up = after.slice(0, s2); down = after.slice(s2 + 1); }
+    else up = after;
+  } else {
+    down = after;
+  }
+  return rubyHtml(base, up, down, !isBar);
+}
+
+/* ---- 折叠块（行内/块级共用渲染） ---- */
+function foldHtml(title, body, close, open, block) {
+  if (close !== undefined && close !== null) {           // 三段式：标题展开后消失，末尾出现收起文本
+    var id = uid('fold');
+    var t = block ? 'div' : 'span';
+    var cls = block ? 'mb-fold-block' : 'mb-fold-inline';
+    return '<' + t + ' class="' + cls + '">'
+         + '<input type="checkbox" class="mb-fold-state" id="' + id + '"' + (open ? ' checked' : '') + '>'
+         + '<label class="mb-fold-title" for="' + id + '">' + inline(title) + '</label>'
+         + '<' + t + ' class="mb-fold-body">' + body + '</' + t + '>'
+         + '<label class="mb-fold-close" for="' + id + '">' + inline(close === '' ? '▲' : close) + '</label>'
+         + '</' + t + '>';
+  }
+  return '<details class="mb-fold"' + (open ? ' open' : '') + '>'
+       + '<summary>' + inline(title) + '</summary>' + body + '</details>';
+}
+
+/* ==================== 行内主循环 ==================== */
+function inline(src, scope, skip) {
+  scope = scope || {};
+  var out = '', i = 0, n = src.length, pendingSkip = skip || 0;
+  function push(s) { out += s; }
+
+  while (i < n) {
+    var c = src[i];
+
+    /* 解析语句 {/`=n} 只作用于紧随其后的那一个块，不向后传递 */
+    if (pendingSkip > 0 && c !== '`' && !src.startsWith('[o[', i)) pendingSkip = 0;
+
+    /* ---- 转义符 / 原始转义符 ---- */
+    if (c === '\\') {
+      var nx = src[i + 1];
+      if (nx === 'o' && src[i + 2] !== undefined) { push(esc(src[i + 2])); i += 3; continue; }
+      if (nx === undefined) { push('\\'); i++; continue; }
+      if (nx === '\n') { i += 2; continue; }
+      var named = { n: '<br>', t: '\t', '<': '&lt;', '>': '&gt;', '&': '&amp;', '\\': '\\' };
+      push(named[nx] !== undefined ? named[nx] : esc(nx));
+      i += 2; continue;
+    }
+
+    /* ---- 解析语句 {/`=n}：让紧随其后的那个块略过前 n 次结束标识 ---- */
+    if (src.startsWith('{/`', i)) {
+      var skm = /^\{\/`(?:=(\d*))?\}/.exec(src.slice(i));
+      if (skm) {
+        pendingSkip = (skm[1] === undefined || skm[1] === '') ? 1 : parseInt(skm[1], 10);
+        i += skm[0].length; continue;
+      }
+    }
+
+    /* ---- 行内代码 ---- */
+    if (c === '`') {
+      var t = 0; while (src[i + t] === '`') t++;
+      var fence = '`'.repeat(t);
+      var e = findFenceEnd(src, i + t, fence, pendingSkip);
+      var skipped = pendingSkip > 0; pendingSkip = 0;
+      if (e < 0 && skipped) {                 // 略过次数多于实际次数 → 延伸到行尾
+        push('<code>' + esc(src.slice(i + t)) + '</code>');
+        i = n; continue;
+      }
+      if (e >= 0) {
+        var code = src.slice(i + t, e);
+        if (code.length > 2 && code[0] === ' ' && code[code.length - 1] === ' ') code = code.slice(1, -1);
+        push('<code>' + esc(code) + '</code>');
+        i = e + t; continue;
+      }
+    }
+
+    /* ---- 原始文本 [o[ ... ]o] ---- */
+    if (src.startsWith('[o[', i)) {
+      var c1 = findFenceEnd(src, i + 3, ']o]', pendingSkip);
+      var skipped2 = pendingSkip > 0; pendingSkip = 0;
+      if (c1 < 0 && skipped2) {               // 略过次数多于实际次数 → 延伸到行尾
+        push('<span class="mb-origin">' + esc(src.slice(i + 3)) + '</span>');
+        i = n; continue;
+      }
+      if (c1 >= 0) {
+        push('<span class="mb-origin">' + esc(src.slice(i + 3, c1)) + '</span>');
+        i = c1 + 3; continue;
+      }
+    }
+
+    /* ---- 可交互元素（含标签的自动绑定） ---- */
+    if (c === ':' || c === '[') {
+      var el = parseElementAt(src, i, scope);
+      if (el) { push(el.html); i = el.end; continue; }
+    }
+
+    /* ---- 分离式折叠块的按钮：~[标题]~>[标识符]（开头的 ~ 不能省） ---- */
+    if (c === '~' || c === '～' || c === '[') {
+      var bm = RE_FOLD_BTN.exec(src.slice(i));
+      if (bm) {
+        var fidB = foldId(bm[2].trim());
+        push('<input type="checkbox" class="mb-fold-state" id="' + esc(fidB)
+           + '" data-mb-rows="' + esc(fidB) + '">'
+           + '<label class="mb-fold-title" for="' + esc(fidB) + '">' + inline(bm[1].trim()) + '</label>');
+        i += bm[0].length; continue;
+      }
+    }
+
+    /* ---- 标签 ::文字: ---- */
+    if (src.startsWith('::', i)) {
+      /* 结束位置取最靠前的那个：第一个可交互元素 / 一个 “:” / 行尾 */
+      var j = i + 2, txt = '', target = null, colon = false;
+      while (j < n && src[j] !== '\n') {
+        var el0 = parseElementAt(src, j, scope);
+        if (el0) { target = el0; break; }
+        if (src[j] === '\\') { txt += src[j + 1] || ''; j += 2; continue; }
+        if (src[j] === ':') { colon = true; j++; break; }
+        txt += src[j]; j++;
+      }
+      if (colon && !target) {                 // “:” 之后还可以跟一个元素
+        var k = j;
+        while (k < n && src[k] !== '\n' && /\s/.test(src[k])) k++;
+        var el1 = parseElementAt(src, k, scope);
+        if (el1) target = el1;
+      }
+      var labelText = txt.replace(/\s+$/, '');
+      if (target) {
+        push('<label class="mb-label">' + inline(labelText) + target.html + '</label>');
+        i = target.end; continue;
+      }
+      push('<label class="mb-label">' + inline(labelText) + '</label>');
+      i = j; continue;
+    }
+
+    /* ---- 图片 / 视频 / 音频 ----
+       基本形态还是 <img>（没有脚本时最差也只是显示成图片），
+       多带一个 data-mb-media，运行时按【文件内容】判断它到底是图片 / 视频 / 音频 */
+    if (c === '!' && src[i + 1] === '[') {
+      var ie = findClose(src, i + 2, '[', ']');
+      if (ie > 0 && src[ie + 1] === '(') {
+        var ic = src.indexOf(')', ie + 1);
+        if (ic > 0) {
+          var murl = src.slice(ie + 2, ic);
+          push('<img src="' + esc(murl) + '" alt="' + esc(src.slice(i + 2, ie))
+             + '" data-mb-media="' + esc(murl) + '">');
+          i = ic + 1; continue;
+        }
+      }
+    }
+
+    /* ---- 上色 ---- */
+    var COLOR = [["!'", "'!", 'mb-fgcolored'], ['!,', ',!', 'mb-bgcolored'],
+                 ['!.', '.!', 'mb-bgpartialcolored'], ['!;', ';!', 'mb-fgcolored mb-bgcolored'],
+                 ['!:', ':!', 'mb-fgcolored mb-bgpartialcolored']];
+    var hitColor = null;
+    for (var ci = 0; ci < COLOR.length; ci++) {
+      if (src.startsWith(COLOR[ci][0], i)) { hitColor = COLOR[ci]; break; }
+    }
+    if (hitColor) {
+      var pc = pair(src, i, hitColor[0], hitColor[1]);
+      if (pc && pc.inner.length) { push(colorSpan(hitColor[2], pc.inner)); i = pc.end; continue; }
+    }
+
+    /* ---- 竖排中的横排 [-[内容]-]（只能在竖排块里用） ---- */
+    if (src.startsWith('[-[', i)) {
+      var vh = pair(src, i, '[-[', ']-]');
+      if (vh) { push('<span class="mb-horizontal">' + inline(vh.inner) + '</span>'); i = vh.end; continue; }
+    }
+    /* ---- 竖排文本 [|[内容]|]（内外两层方括号都是必需的，[|内容|] 不合法） ---- */
+    if (src.startsWith('[|[', i)) {
+      var vv = pair(src, i, '[|[', ']|]');
+      if (vv) { push('<span class="mb-vertical">' + inline(vv.inner).replace(/\n/g, '<br>') + '</span>'); i = vv.end; continue; }
+    }
+
+    /* ---- 全角竖排「「」」「『』」 ---- */
+    if (src.startsWith('「「', i)) {
+      var v1 = pair(src, i, '「「', '」」');
+      if (v1) { push('<span class="mb-vertical">' + inline(v1.inner).replace(/\n/g, '<br>') + '</span>'); i = v1.end; continue; }
+    }
+    if (src.startsWith('『『', i)) {
+      var v2 = pair(src, i, '『『', '』』');
+      if (v2) { push('<span class="mb-horizontal">' + inline(v2.inner) + '</span>'); i = v2.end; continue; }
+    }
+
+    /* ---- 折叠块 ---- */
+    if (src.startsWith('~[', i)) {
+      var fo = tryFoldInline(src, i, scope);
+      if (fo) { push(fo.html); i = fo.end; continue; }
+    }
+
+    /* ---- 链接 [text](url) / 脚注 [^n] ---- */
+    if (c === '[') {
+      if (src[i + 1] === '^') {
+        var fe = src.indexOf(']', i);
+        if (fe > 0) {
+          var key = src.slice(i + 2, fe);
+          push('<sup class="mb-fnref"><a href="#fn-' + esc(key) + '">' + esc(key) + '</a></sup>');
+          i = fe + 1; continue;
+        }
+      }
+      var le = findClose(src, i + 1, '[', ']');
+      if (le > 0 && src[le + 1] === '(') {
+        var lc = src.indexOf(')', le + 1);
+        if (lc > 0) {
+          var href = src.slice(le + 2, lc);
+          if (href.startsWith('::')) href = '#' + href.slice(2);
+          push('<a href="' + esc(href) + '">' + inline(src.slice(i + 1, le)) + '</a>');
+          i = lc + 1; continue;
+        }
+      }
+    }
+
+    /* ---- ruby ----（`【内容】` 没写 | / / 就不是 ruby，连【】一起按普通文本输出） */
+    if (c === '【') {
+      var rb = pair(src, i, '【', '】');
+      if (rb) {
+        var rbHtml2 = parseRuby(rb.inner);
+        if (rbHtml2 !== null) { push(rbHtml2); i = rb.end; continue; }
+      }
+    }
+    if (src.startsWith('[(', i)) {
+      var rb2 = pair(src, i, '[(', ')]');
+      if (rb2) {
+        var rbHtml3 = parseRuby(rb2.inner);
+        if (rbHtml3 !== null) { push(rbHtml3); i = rb2.end; continue; }
+      }
+    }
+
+    /* ---- 变大 ---- */
+    var big = pair(src, i, '<-[', ']->') || pair(src, i, '+[', ']+');
+    if (big) { push('<span class="mb-bigger">' + inline(big.inner) + '</span>'); i = big.end; continue; }
+    /* ---- 变小 ---- */
+    var small = pair(src, i, '->[', ']<-') || pair(src, i, '-[', ']-');
+    if (small) { push('<span class="mb-smaller">' + inline(small.inner) + '</span>'); i = small.end; continue; }
+
+    /* ---- 上标 / 下标 ---- */
+    var sup = pair(src, i, '^[', ']^');
+    if (sup) { push('<sup>' + inline(sup.inner) + '</sup>'); i = sup.end; continue; }
+    var sub = pair(src, i, '_[', ']_');
+    if (sub) { push('<sub>' + inline(sub.inner) + '</sub>'); i = sub.end; continue; }
+
+    /* ---- 注解 / 灰色 / 涂黑 ---- */
+    var com = pair(src, i, '_(', ')_');
+    if (com) { push('<span class="mb-commental">' + inline(com.inner) + '</span>'); i = com.end; continue; }
+    var gray = pair(src, i, '@(', ')@');
+    if (gray) { push('<span class="mb-gray">' + inline(gray.inner) + '</span>'); i = gray.end; continue; }
+    var blk = pair(src, i, '#(', ')#');
+    if (blk) { push('<span class="mb-blacked">' + inline(blk.inner) + '</span>'); i = blk.end; continue; }
+
+    /* ---- 功能语句 ---- */
+    if (c === '{') {
+      // 命名语句：写在元素【后面】——给紧挨在它前面的那个元素取名；
+      // 前面是普通文字（不是元素）时，交给“它所在的那个块”（标题 / 段落 / 列表项 / 单元格）
+      if (src[i + 1] === '#' || src[i + 1] === '.') {
+        var ne = src.indexOf('}', i);
+        if (ne > 0) {
+          var nm = namesAttrs([src.slice(i + 1, ne)]);
+          var te = out.length ? trailingElement(out) : null;
+          if (te !== null) out = injectAttrsAt(out, te, nm);
+          else if (scope.attrs) scope.attrs.push(nm);
+          i = ne + 1; continue;
+        }
+      }
+      // 内容语句
+      if (src.startsWith('{:', i)) {
+        var ce = findClose(src, i + 1, '{:', ':}');
+        if (ce > 0) {
+          var parts = src.slice(i + 2, ce).split(':');
+          push(esc(contentStatement(parts[0] || '', parts[1] || '')));
+          i = ce + 2; continue;
+        }
+      }
+      // 计算语句 {`expr`}
+      if (src[i + 1] === '`') {
+        var ce2 = src.indexOf('`', i + 2);
+        if (ce2 > 0 && src[ce2 + 1] === '}') {
+          var pe = pair(src, i, '{`', '`}');
+          push(calcStatement(src.slice(i + 2, ce2)));
+          i = ce2 + 2; continue;
+        }
+      }
+      // 排版调整语句 {| ... |}
+      if (src.startsWith('{|', i)) {
+        var le2 = src.indexOf('|}', i + 2);
+        if (le2 > 0) { i = le2 + 2; continue; }          // 行内使用：只影响所在块，先略过
+      }
+      // 图表生成语句 {[ ... ]}
+      if (src.startsWith('{[', i)) {
+        var ch = pair(src, i, '{[', ']}');
+        if (ch) { push(chartHtml(ch.inner)); i = ch.end; continue; }
+      }
+      // 变量语句 {$name$}
+      if (src[i + 1] === '$') {
+        var ve = src.indexOf('$}', i + 2);
+        if (ve > 0) { push(varStatement(src.slice(i + 2, ve))); i = ve + 2; continue; }
+      }
+      // 执行语句 {{...}}
+      if (src[i + 1] === '{') {
+        var k2 = i + 1, groups = [];
+        while (src[k2] === '{') {
+          var be = braceEnd(src, k2);
+          if (be < 0) break;
+          groups.push(src.slice(k2 + 1, be));
+          k2 = be + 1;
+        }
+        if (groups.length && src[k2] === '}') {
+          push(execStatement(groups.join('}{'), scope));
+          i = k2 + 1; continue;
+        }
+      }
+    }
+    /* ---- aria-label：在元素【后面】写 ((描述))（标准 3.22）----
+       例：`![图片](url)((一张猫的照片))` → 给这个元素加 aria-label */
+    if (src.startsWith('((', i)) {
+      var ae = findClose(src, i + 2, '(', ')');
+      if (ae > 0) {
+        var aattr = ' aria-label="' + esc(src.slice(i + 2, ae).replace(/\s*\n\s*/g, ' ')) + '"';
+        var at = out.length ? trailingElement(out) : null;
+        if (at !== null) out = injectAttrsAt(out, at, aattr);
+        else if (scope.attrs) scope.attrs.push(aattr);
+        i = ae + 2; continue;
+      }
+    }
+
+    /* ---- 变量 $name$ / 行内 LaTeX 公式 $公式$ ----
+       内容恰好是一个合法变量名 → 变量（3.9.8）；否则 → 公式（3.23）。
+       想强制当公式时前后各加一个空格（`$ x $`），LaTeX 会忽略这些空格。 */
+    if (c === '$' && src[i + 1] !== '$') {
+      var vEnd = src.indexOf('$', i + 1);
+      if (vEnd > 0) {
+        var vName = src.slice(i + 1, vEnd);
+        if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(vName)) { push(varStatement(vName)); i = vEnd + 1; continue; }
+        if (vName.length) { push(mathInline(vName)); i = vEnd + 1; continue; }
+      }
+    }
+
+    /* ---- 强调 / 加粗 / 删除线 ---- */
+    if (src.startsWith('**', i) || src.startsWith('__', i)) {
+      var be2 = findSame(src, i + 2, src.slice(i, i + 2));
+      if (be2 > i + 2) { push('<strong>' + inline(src.slice(i + 2, be2)) + '</strong>'); i = be2 + 2; continue; }
+    }
+    if (src.startsWith('~~', i)) {
+      var se = findSame(src, i + 2, '~~');
+      if (se > i + 2) { push('<del>' + inline(src.slice(i + 2, se)) + '</del>'); i = se + 2; continue; }
+    }
+    if (c === '*') {
+      var e2 = findSame(src, i + 1, '*');
+      if (e2 > i + 1) { push('<em>' + inline(src.slice(i + 1, e2)) + '</em>'); i = e2 + 1; continue; }
+    }
+    if (c === '_') {          // mb：单个下划线 = 下划线，斜体一律用 *
+      var e5 = findSame(src, i + 1, '_');
+      if (e5 > i + 1) { push('<u>' + inline(src.slice(i + 1, e5)) + '</u>'); i = e5 + 1; continue; }
+    }
+
+    /* ---- HTML 原样 ---- */
+    if (c === '<') {
+      var hm = /^<\/?[a-zA-Z][\w-]*(\s[^<>]*)?\/?>/.exec(src.slice(i));
+      if (hm) { push(hm[0]); i += hm[0].length; continue; }
+      if (src.startsWith('<!--', i)) {
+        var hc = src.indexOf('-->', i + 4);
+        if (hc > 0) { push(src.slice(i, hc + 3)); i = hc + 3; continue; }
+      }
+    }
+
+    /* ---- 普通字符 ---- */
+    if (c === '&') {
+      var ent = /^&[#a-zA-Z0-9]+;/.exec(src.slice(i));
+      if (ent) { push(ent[0]); i += ent[0].length; continue; }
+    }
+    push(esc(c));
+    i++;
+  }
+  return out;
+}
+
+/* 行内两段/三段折叠块 */
+function scanFold(src, i) {
+  var t = pair(src, i, '~[', ']');
+  if (!t) return null;
+  var j = t.end, open = false;
+  if (src[j] === ':') { open = true; j++; }
+  var body = pair(src, j, '[', ']');
+  if (!body) return null;
+  var third = pair(src, body.end, '[', ']');
+  return {
+    title: t.inner, body: body.inner,
+    close: third ? third.inner : null, open: open,
+    end: third ? third.end : body.end
+  };
+}
+function tryFoldInline(src, i, scope) {
+  var f = scanFold(src, i);
+  if (!f) return null;
+  if (f.close !== null) {
+    return { html: foldHtml(f.title, inline(f.body), f.close, f.open, false), end: f.end };
+  }
+  return { html: foldHtml(f.title, inline(f.body), undefined, f.open, false), end: f.end };
+}
+
+/* ---- 图表 ---- */
+var PALETTE = ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f', '#edc948', '#b07aa1'];
+function chartHtml(inner) {
+  var parts = inner.split(':');
+  var kind = (parts[0] || '').trim();         // 类型名用英文（C.23）：bar / line / pie / table
+  var dataStr = (parts[1] || '').trim();
+  var extra = parts.slice(2).join(':').trim();
+  var title = '';
+  var tm = /标题\s*=\s*([^;]*)/.exec(extra);
+  if (tm) title = tm[1].trim();
+  var nums = dataStr.split(/[,;]/).map(function (s) { return s.trim(); }).filter(Boolean);
+  var vals = nums.map(function (s) {
+    var v = Number(s);
+    if (!isNaN(v) && s !== '') return v;
+    try { var r = evalExpr(s, Object.create(null)); return Number(r) || 0; } catch (e) { return 0; }
+  });
+  var label = title ? esc(title) : esc(kind === 'bar' ? '柱状图' : kind === 'line' ? '折线图' : kind === 'pie' ? '饼图' : '表格');
+  var aria = ' role="img" aria-label="' + label + '"';
+  if (kind === 'bar') {
+    var max = Math.max.apply(null, vals.concat([1]));
+    var bars = vals.map(function (v) {
+      return '<div class="mb-bar" style="--mb-v:' + v + '"><span>' + v + '</span></div>';
+    }).join('');
+    return '<figure class="mb-chart mb-chart-bar" style="--mb-max:' + max + '"' + aria + '>' + bars + '</figure>';
+  }
+  if (kind === 'line') {
+    var mx = Math.max.apply(null, vals.concat([1]));
+    var step = vals.length > 1 ? 100 / (vals.length - 1) : 0;
+    var pts = vals.map(function (v, k) {
+      return (k * step).toFixed(1) + ',' + (40 - (v / mx) * 40).toFixed(1);
+    }).join(' ');
+    return '<svg class="mb-chart" viewBox="0 0 100 40" preserveAspectRatio="none"' + aria + '>'
+         + '<polyline fill="none" stroke="currentColor" stroke-width="1" vector-effect="non-scaling-stroke" points="'
+         + pts + '"></polyline></svg>';
+  }
+  if (kind === 'pie') {
+    var sum = vals.reduce(function (a, b) { return a + b; }, 0) || 1;
+    var off = 25, seg = '';
+    vals.forEach(function (v, k) {
+      var pct = (v / sum) * 100;
+      seg += '<circle cx="21" cy="21" r="15.9155" fill="none" stroke="' + PALETTE[k % PALETTE.length]
+           + '" stroke-width="10" stroke-dasharray="' + pct.toFixed(2) + ' ' + (100 - pct).toFixed(2)
+           + '" stroke-dashoffset="' + off.toFixed(2) + '"></circle>';
+      off -= pct;
+    });
+    return '<svg class="mb-chart mb-chart-pie" viewBox="0 0 42 42"' + aria + '>' + seg + '</svg>';
+  }
+  if (kind === 'table') {
+    var rows = dataStr.split(';').map(function (r) { return r.split(','); }).filter(function (r) { return r.length; });
+    var h = '<table><thead><tr>' + rows[0].map(function (c) { return '<th>' + inline(c.trim()) + '</th>'; }).join('') + '</tr></thead><tbody>';
+    for (var r = 1; r < rows.length; r++) {
+      h += '<tr>' + rows[r].map(function (c) { return '<td>' + inline(c.trim()) + '</td>'; }).join('') + '</tr>';
+    }
+    return h + '</tbody></table>';
+  }
+  warn('未知的图表类型：' + kind + '（可用 bar / line / pie / table）');
+  return esc('{[' + inner + ']}');
+}
+
+/* ==================================================================
+   4. 表格
+   ================================================================== */
+function splitRow(line) {
+  // 按 | 切分，跳过行内代码段里的 |
+  var cells = [], cur = '', k = 0, n = line.length, hasLead = false;
+  if (line[0] === '|') { hasLead = true; k = 1; }
+  while (k < n) {
+    var c = line[k];
+    if (c === '\\') { cur += line.slice(k, k + 2); k += 2; continue; }
+    if (c === '`') {
+      var t = 0; while (line[k + t] === '`') t++;
+      var fence = '`'.repeat(t), e = line.indexOf(fence, k + t);
+      if (e >= 0) { cur += line.slice(k, e + t); k = e + t; continue; }
+    }
+    if (line.startsWith('{|', k)) {                  // 排版调整语句整个跳过
+      var lo = line.indexOf('|}', k + 2);
+      if (lo >= 0) { cur += line.slice(k, lo + 2); k = lo + 2; continue; }
+    }
+    if (c === '|') { cells.push(cur); cur = ''; k++; continue; }
+    cur += c; k++;
+  }
+  if (cur.trim() !== '' || line[line.length - 1] !== '|') cells.push(cur);
+  return cells;
+}
+function isDelimRow(line) {
+  return /^\s*\|?[\s:|-]*-[\s:|-]*\|[\s:|-]*$/.test(line) && /-/.test(line) && /\|/.test(line);
+}
+function tableAlign(line) {
+  return splitRow(line).map(function (s) {
+    s = s.trim();
+    var l = s[0] === ':', r = s[s.length - 1] === ':';
+    return l && r ? 'center' : r ? 'right' : l ? 'left' : '';
+  });
+}
+
+/* 斜线单元格 */
+function slashCell(text) {
+  var m = /^%\(([\s\S]*)\)%$/.exec(text);                 // 两侧都有 % → 非法
+  if (m) {
+    warn('斜线单元格两侧都写了 “%”，已按普通文字输出：' + text);
+    return null;
+  }
+  var left = /^%\(([\s\S]*)\)$/.exec(text);
+  var right = /^\(([\s\S]*)\)%$/.exec(text);
+  if (!left && !right) return null;
+  var body = (left ? left[1] : right[1]);
+  var isBack = body.indexOf('\\') >= 0;
+  var segs = body.split(isBack ? '\\' : '/').map(function (s) { return s.trim(); });
+  if (segs.length < 2) return null;
+  // 汇聚角：左侧的 % 配 / 在左下、配 \ 在左上；右侧的 % 配 / 在右上、配 \ 在右下
+  var corner = (isBack ? (left ? 't' : 'b') : (left ? 'b' : 't')) + (left ? 'l' : 'r');
+  var fan = slashFan(corner, segs.length);
+  var cls = 'mb-slash ' + (isBack ? 'mb-slash-d' : 'mb-slash-u');
+  var h = '';
+  // 线
+  if (fan.rays.length > 1) {
+    h += '<svg class="mb-slash-fan" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">'
+       + fan.rays.slice(1).map(function (r) {
+           return '<line x1="' + fan.c.x * 100 + '" y1="' + fan.c.y * 100
+                + '" x2="' + (r[0] * 100).toFixed(2) + '" y2="' + (r[1] * 100).toFixed(2) + '"></line>';
+         }).join('')
+       + '</svg>';
+  }
+  // 文本（按从左往右）
+  var order = fan.anchors.map(function (a, k) { return { a: a, k: k }; })
+                         .sort(function (p, q) { return p.a[0] - q.a[0]; });
+  order.forEach(function (o, pos) {
+    var role = pos === 0 ? 'head' : pos === segs.length - 1 ? 'tail' : 'mid';
+    h += '<span class="mb-slash-' + role + '" style="left:' + (o.a[0] * 100).toFixed(1) + '%;top:'
+       + (o.a[1] * 100).toFixed(1) + '%;transform:translate(-50%,-50%)">' + inline(segs[o.k]) + '</span>';
+  });
+  return { cls: cls, html: h };
+}
+/* 单位方格里，从汇聚角出发等分 90° 扇形的射线与各块的锚点 */
+function slashFan(corner, num) {
+  var C = { bl: [0, 1], tl: [0, 0], tr: [1, 0], br: [1, 1] }[corner];
+  var E1 = { bl: [0, -1], tl: [1, 0], tr: [0, 1], br: [-1, 0] }[corner];
+  var E2 = { bl: [1, 0], tl: [0, 1], tr: [-1, 0], br: [0, -1] }[corner];
+  function onSquare(px, py, dx, dy) {
+    var best = Infinity;
+    if (dx > 1e-9) best = Math.min(best, (1 - px) / dx);
+    if (dx < -1e-9) best = Math.min(best, (0 - px) / dx);
+    if (dy > 1e-9) best = Math.min(best, (1 - py) / dy);
+    if (dy < -1e-9) best = Math.min(best, (0 - py) / dy);
+    return [px + dx * best, py + dy * best];
+  }
+  var P = [];                                  // P[0] = 起始角点, P[num] = 结束角点
+  P.push(onSquare(C[0], C[1], E1[0], E1[1]));
+  for (var k = 1; k < num; k++) {
+    var f = (k / num) * (Math.PI / 2);
+    var dx = Math.cos(f) * E1[0] + Math.sin(f) * E2[0];
+    var dy = Math.cos(f) * E1[1] + Math.sin(f) * E2[1];
+    P.push(onSquare(C[0], C[1], dx, dy));
+  }
+  P.push(onSquare(C[0], C[1], E2[0], E2[1]));
+  var anchors = [], rays = [];
+  for (var r = 1; r < num; r++) rays.push(P[r]);
+  for (var g = 0; g < num; g++) {
+    anchors.push([(C[0] + P[g][0] + P[g + 1][0]) / 3, (C[1] + P[g][1] + P[g + 1][1]) / 3]);
+  }
+  return { c: { x: C[0], y: C[1] }, rays: rays, anchors: anchors };
+}
+
+/* 渲染一张表（含侧边表头、延续符、斜线、折叠块） */
+function renderTable(rowTexts, aligns, folds, folded) {
+  folds = folds || [];
+  folded = folded || [];
+  /* 1. 切成单元格；|| 留下的空占位用于标记侧边表头 */
+  var grid = rowTexts.map(function (t) {
+    var cells = splitRow(t), marker = -1;
+    for (var q = 0; q < cells.length; q++) if (cells[q].trim() === '') { marker = q; break; }
+    var list = cells.slice();
+    if (marker >= 0) list.splice(marker, 1);
+    return {
+      sideCount: marker < 0 ? 0 : marker,
+      cells: list.map(function (s) { return { text: s.trim(), colspan: 1, rowspan: 1, dead: false, side: false }; })
+    };
+  });
+  grid.forEach(function (row) {
+    row.cells.forEach(function (c, k) { if (k < row.sideCount) c.side = true; });
+  });
+  /* 2. colspan（[+>] 与左边合并） */
+  grid.forEach(function (row) {
+    var last = null;
+    row.cells.forEach(function (c) {
+      if (c.text === '[+>]' && last) { last.colspan++; c.dead = true; }
+      else last = c;
+    });
+  });
+  /* 3. rowspan（[+] 与上边合并）——按“逻辑列”向上找最近的活单元格 */
+  function cellAbove(r, col) {
+    for (var rr = r - 1; rr >= 0; rr--) {
+      var cells = grid[rr].cells;
+      for (var q = 0; q < cells.length; q++) {
+        var u = cells[q];
+        if (u._col <= col && col < u._col + u.colspan) {
+          if (!u.dead) return u;
+          break;                                  // 这一格已被并掉 → 继续往上找
+        }
+      }
+    }
+    return null;
+  }
+  grid.forEach(function (row, r) {
+    var col = 0;
+    row.cells.forEach(function (c) { c._col = col; col += c.colspan; });
+    if (!r) return;
+    row.cells.forEach(function (c) {
+      if (c.text !== '[+]') return;
+      var up = cellAbove(r, c._col);
+      if (up) { up.rowspan++; c.dead = true; }
+    });
+  });
+  /* 4. 输出每一行 */
+  var rowsHtml = grid.map(function (row, r) {
+    var head = (r === 0), html = '', k = 0;
+    row.cells.forEach(function (c) {
+      if (c.dead) return;
+      var tag = (head || c.side) ? 'th' : 'td';
+      var attrs = '', clsList = [];
+      // 跨行一律按“原始跨度”给：被折叠的行仍然留在表格里（见 .mb-fold-off），
+      // 所以 rowspan 不需要也不应该按“看得见的行数”去减
+      if (c.rowspan > 1) attrs += ' rowspan="' + c.rowspan + '"';
+      if (c.colspan > 1) attrs += ' colspan="' + c.colspan + '"';
+      if (c.side) attrs += (head ? ' scope="col"' : ' scope="row"');   // 表头那一格是列标题
+      /* 单元格末尾的命名语句 / aria-label：修改该单元格 */
+      var text = c.text;
+      var ncm = /^(.*?)\s*\{([#.][^}]*)\}\s*$/.exec(text);
+      if (ncm) { attrs += namesAttrs([ncm[2]]); text = ncm[1].trim(); }
+      var acm = /^(.*?)\s*\(\(([^()]*)\)\)\s*$/.exec(text);
+      if (acm) { attrs += ' aria-label="' + esc(acm[2]) + '"'; text = acm[1].trim(); }
+      /* 单元格末尾的排版调整语句：修改该单元格 */
+      var tcm = /^(.*?)\s*\{\|([^}]*)\|\}\s*$/.exec(text);
+      if (tcm) {
+        var lcc = layoutClasses(tcm[2]);
+        if (lcc.length) { text = tcm[1].trim(); clsList = clsList.concat(lcc); }
+      }
+      var al = aligns[k];
+      if (al) attrs += ' style="text-align:' + al + '"';
+      var sl = slashCell(text);
+      if (sl) clsList.push(sl.cls);
+      if (clsList.length) attrs = ' class="' + clsList.join(' ') + '"' + attrs;
+      html += '<' + tag + attrs + '>' + (sl ? sl.html : inline(text)) + '</' + tag + '>';
+      k += c.colspan;
+    });
+    return { html: html, attrs: '' };
+  });
+  /* 5. 把折叠块挂上去 */
+  folds.forEach(function (f) {
+    var id = uid('tfold');
+    var anchor = f.startRow - 1;
+    var first = splitRow(rowTexts[f.rows[0]]), marker = -1;
+    for (var q = 0; q < first.length; q++) if (first[q].trim() === '') { marker = q; break; }
+    if (marker >= 0) first.splice(marker, 1);
+    var colIdx = 0;
+    for (var q2 = 0; q2 < first.length; q2++) {
+      var v = first[q2].trim();
+      if (v !== '[+]' && v !== '[+>]' && v !== '') { colIdx = q2; break; }
+    }
+    var marked = '<input type="checkbox" class="mb-fold-state" id="' + id + '" data-mb-rows="' + id + '">'
+               + '<label class="mb-fold-title" for="' + id + '">' + inline(f.title) + '</label>';
+    if (rowsHtml[anchor]) {
+      var seg = rowsHtml[anchor].html, n2 = 0, ins = -1, m2;
+      var re2 = /<t[dh][^>]*>/g;
+      while ((m2 = re2.exec(seg))) { if (n2++ === colIdx) { ins = m2.index + m2[0].length; break; } }
+      if (ins >= 0) {
+        var shut = seg.indexOf('</t', ins);        // 按钮放在该单元格内容的末尾
+        if (shut < 0) shut = ins;
+        rowsHtml[anchor].html = seg.slice(0, shut) + marked + seg.slice(shut);
+      }
+    }
+    f.rows.forEach(function (r) {
+      if (rowsHtml[r]) rowsHtml[r].attrs += ' data-mb-fold="' + id + '" class="mb-fold-off"';
+    });
+  });
+  /* 5b. 分离式折叠块盖住的行 */
+  folded.forEach(function (fd) {
+    if (rowsHtml[fd.row]) rowsHtml[fd.row].attrs += ' data-mb-fold="' + esc(fd.id) + '" class="mb-fold-off"';
+  });
+  /* 6. 拼成 table */
+  var h = '<table>\n';
+  if (rowsHtml.length) h += '<thead><tr>' + rowsHtml[0].html + '</tr></thead>\n<tbody>\n';
+  for (var r2 = 1; r2 < rowsHtml.length; r2++) {
+    h += '<tr' + rowsHtml[r2].attrs + '>' + rowsHtml[r2].html + '</tr>\n';
+  }
+  return h + '</tbody></table>\n';
+}
+
+/* ==================================================================
+   5. 块级解析
+   ================================================================== */
+function isBlank(s) { return !/\S/.test(s); }
+function looksLikeTable(lines, i) {
+  if (i + 1 >= lines.length) return false;
+  if (!lines[i].includes('|')) return false;
+  return isDelimRow(lines[i + 1]);
+}
+function collectTable(lines, i) {
+  var rows = [], folds = [], j = i;
+  rows.push(lines[j]); j++;                       // 表头
+  j++;                                            // 分隔行
+  var pending = null, folded = [], loose = [];
+  while (j < lines.length) {
+    var L = lines[j];
+    if (isBlank(L)) break;
+    /* 分离式折叠块的内容区：[id]~>[ … ] */
+    var fs = isFoldContentStart(L, true);       // 宽松：标识符对不上也要认出来，免得切断表格
+    var rc = fs ? readFoldContent(lines, j, fs[2]) : null;
+    var tableish = rc && rc.lines.some(function (ln) { return /^\s*\|/.test(ln); });
+    if (rc && rc.ok && tableish) {
+      var fidC = foldId(fs[1]);
+      var matched = !!FOLD_IDS[fs[1]];           // 有没有对应的按钮
+      var absorbed = 0, rest = [], inTable = true;
+      rc.lines.forEach(function (ln, idx) {
+        if (ln.trim() === '') {                 // 空行：已经并过行就表示“表格到此为止”
+          if (absorbed) inTable = false;
+          return;
+        }
+        if (idx === 0 && !/^\s*\|/.test(ln)) {  // `[id]~>[` 后面剩的零碎文字：不算一行、也不结束表格
+          rest.push(ln);
+          return;
+        }
+        if (inTable && /^\s*\|/.test(ln)) {
+          rows.push(ln);
+          // 没有按钮就别藏，免得内容再也出不来（compile 里会给出提醒）
+          if (matched) folded.push({ id: fidC, row: rows.length - 1 });
+          absorbed++;
+        } else {
+          inTable = false; rest.push(ln);
+        }
+      });
+      j = rc.next;
+      if (rest.length) loose.push({ id: fidC, lines: rest });
+      if (!absorbed) break;                       // 内容里没有表格行 → 表格到此为止
+      continue;
+    }
+    var t = L.trim();
+    if (/^~\[/.test(t)) {                         // 折叠块开始（一行）
+      var fo = pair(L, L.indexOf('~['), '~[', ']');
+      if (fo) {
+        pending = { title: fo.inner, startRow: rows.length, rows: [] };
+        j++; continue;
+      }
+    }
+    if (pending && /^\]/.test(t)) {               // 折叠块结束
+      folds.push(pending); pending = null; j++; continue;
+    }
+    if (!/\|/.test(L)) break;
+    rows.push(L);
+    if (pending) pending.rows.push(rows.length - 1);
+    j++;
+  }
+  return { rows: rows, folds: folds, folded: folded, loose: loose, next: j };
+}
+/* 折叠块已经并入 renderTable，这里只留一个薄封装 */
+function renderFoldTable(rows, folds, aligns) {
+  return renderTable(rows, aligns, folds);
+}
+
+/* ---- 段落里的“接行”与“跨行”处理 ---- */
+function countOf(s, t) {
+  var n = 0, p = 0, q;
+  for (;;) { q = s.indexOf(t, p); if (q < 0) return n; n++; p = q + t.length; }
+}
+/* 行尾的 `\`（标准 3.15 规则 4）：把下一行【原样】接上来——不留空格、不留换行 */
+function joinHardLines(lines) {
+  var out = [], i, cur, cnt, q;
+  for (i = 0; i < lines.length; i++) {
+    cur = lines[i];
+    for (;;) {
+      cnt = 0; q = cur.length - 1;
+      while (q >= 0 && cur.charAt(q) === '\\') { cnt++; q--; }
+      if (cnt % 2 === 0 || i + 1 >= lines.length) break;   // 偶数个 → 末尾是转义出来的 \
+      cur = cur.slice(0, -1) + lines[++i];
+    }
+    out.push(cur);
+  }
+  return out;
+}
+/* 可以跨行的行内语法：[|[ ]|]（竖排）、[o[ ]o]（原始文本）、「「」」、『『』』。
+   它们的收尾靠的是明确的结束标识而不是行，所以**空行也不打断**（C.23）。
+   检测时先去掉行内代码段，免得“正文里讲语法”的那种写法被误判。 */
+var MULTI_PAIRS = [['[|[', ']|]'], ['[o[', ']o]'], ['「「', '」」'], ['『『', '』』']];
+function stripCode(s) { return String(s).replace(/`+[^`]*`+/g, ' '); }
+function unclosedMulti(line) {
+  var t = stripCode(line);
+  for (var k = 0; k < MULTI_PAIRS.length; k++) {
+    if (countOf(t, MULTI_PAIRS[k][0]) > countOf(t, MULTI_PAIRS[k][1])) return true;
+  }
+  return false;
+}
+function mergeMultilineBlocks(lines) {
+  var out = [], i, cur, guard, f, mark, close;
+  for (i = 0; i < lines.length; i++) {
+    f = /^\s*(```+|~~~+)\s*[^\s`]*\s*$/.exec(lines[i]);
+    if (f) {                       // 代码块：整体照抄，里面一行都不动
+      out.push(lines[i]);
+      mark = f[1][0].repeat(3);
+      close = new RegExp('^\\s*' + mark + '\\s*$');
+      i++;
+      while (i < lines.length) { out.push(lines[i]); if (close.test(lines[i])) break; i++; }
+      continue;
+    }
+    cur = lines[i]; guard = 0;
+    while (unclosedMulti(cur) && i + 1 < lines.length && !/^\s*(```+|~~~+)/.test(lines[i + 1])) {
+      i++; cur += '\n' + lines[i];
+      if (++guard > 400) break;
+    }
+    out.push(cur);
+  }
+  return out;
+}
+
+function parseBlocks(lines) {
+  lines = mergeMultilineBlocks(lines);   // 竖排 / 原始文本可以跨行，空行也不打断
+  var out = [], i = 0, n = lines.length, pendingName = null, nameMark = 0, pendingSkip = 0;
+  while (i < n) {
+    var line = lines[i];
+    if (isBlank(line)) { i++; continue; }
+
+    /* 代码块 */
+    var fm = /^\s*(```+|~~~+)\s*([^\s`]*)\s*$/.exec(line);
+    if (fm) {
+      var fence = fm[1][0].repeat(3), lang = fm[2];
+      var buf = [], j = i + 1, skipFence = pendingSkip;
+      pendingSkip = 0;
+      var closeRe = new RegExp('^\\s*' + fence + '\\s*$');
+      while (j < n) {
+        if (closeRe.test(lines[j])) {
+          if (skipFence > 0) { skipFence--; buf.push(lines[j]); j++; continue; }
+          break;
+        }
+        buf.push(lines[j]); j++;
+      }
+      out.push('<pre><code' + (lang ? ' class="language-' + esc(lang) + '"' : '') + '>'
+               + esc(buf.join('\n')) + '</code></pre>');
+      i = j + 1; continue;
+    }
+
+    /* LaTeX 公式块：$$$ … $$$（可以跨行，中间的空行也属于公式；也可以写成一行 $$$公式$$$） */
+    if (/^\s*\$\$\$/.test(line)) {
+      var mlines = [], mj = i, found = false;
+      var firstPart = line.replace(/^\s*\$\$\$/, '');
+      var cc = firstPart.indexOf('$$$');
+      if (cc >= 0) { mlines.push(firstPart.slice(0, cc)); mj = i + 1; found = true; }
+      else {
+        mlines.push(firstPart);
+        for (mj = i + 1; mj < n; mj++) {
+          var c2 = lines[mj].indexOf('$$$');
+          if (c2 >= 0) { mlines.push(lines[mj].slice(0, c2)); mj++; found = true; break; }
+          mlines.push(lines[mj]);
+        }
+      }
+      if (found) {                       // 没写收尾的 $$$ → 按普通文字处理（附录 B 第 8 条）
+        out.push(mathBlock(mlines.join('\n')));
+        i = mj; continue;
+      }
+    }
+
+    /* 解析语句 {/`=n} —— 只影响紧随其后的那一个块 */
+    var pm = /^\s*\{\/`(?:=(\d*))?\}\s*$/.exec(line);
+    if (pm) {
+      pendingSkip = (pm[1] === undefined || pm[1] === '') ? 1 : parseInt(pm[1], 10);
+      i++; continue;
+    }
+
+    /* 把上一轮单独成行的命名语句 / aria-label 作用到它下面的块上 */
+    if (pendingName && out.length > nameMark) {
+      out[nameMark] = injectAttrsRaw(out[nameMark], pendingName);
+      pendingName = null;
+    }
+
+    /* 命名语句 / aria-label 单独成行：作用到【它上面】的那个块
+       （上面还没有块时才作用到下面的块——旧写法兼容） */
+    var solo = /^\s*\{([#.][^}]*)\}\s*$/.exec(line);
+    var soloAria = solo ? null : /^\s*\(\(([^()]*)\)\)\s*$/.exec(line);
+    if (solo || soloAria) {
+      var soloAttr = solo ? nameAttrs(solo[1]) : ' aria-label="' + esc(soloAria[1]) + '"';
+      if (out.length) out[out.length - 1] = injectAttrsRaw(out[out.length - 1], soloAttr);
+      else { pendingName = soloAttr; nameMark = 0; }
+      i++; continue;
+    }
+
+    /* 标题（末尾可以跟命名语句，如 `#标题1 {#t1}`） */
+    var hm = /^(#{1,6})\s+(.*)$/.exec(line);
+    if (hm) {
+      var hs = { attrs: [] };
+      var hbody = inline(hm[2].replace(/\s+#+\s*$/, ''), hs);
+      var hattr = hs.attrs.join('');
+      out.push('<h' + hm[1].length + hattr + '>' + hbody + '</h' + hm[1].length + '>');
+      i++; continue;
+    }
+
+    /* 分隔线 */
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) { out.push('<hr>'); i++; continue; }
+
+    /* 引用块 */
+    if (/^\s*>/.test(line)) {
+      var q = [];
+      while (i < n && /^\s*>/.test(lines[i])) { q.push(lines[i].replace(/^\s*>\s?/, '')); i++; }
+      out.push('<blockquote>\n' + parseBlocks(q) + '</blockquote>\n');
+      continue;
+    }
+
+    /* 表格 */
+    if (looksLikeTable(lines, i)) {
+      var tb = collectTable(lines, i);
+      out.push(renderTable(tb.rows, tableAlign(lines[i + 1]), tb.folds, tb.folded));
+      tb.loose.forEach(function (lo) {              // 折叠内容里不是表格行的部分
+        out.push('<div class="mb-fold-body" data-mb-fold="' + esc(lo.id) + '" hidden>\n'
+                 + parseBlocks(lo.lines) + '</div>\n');
+      });
+      i = tb.next; continue;
+    }
+
+    /* 定义列表 */
+    if (i + 1 < n && /^\s*[:：]\s+/.test(lines[i + 1])) {
+      var dl = '<dl>\n', term = line;
+      while (i < n && /^\s*[:：]\s+/.test(lines[i])) {
+        dl += '<dt>' + inline(term) + '</dt><dd>' + inline(lines[i].replace(/^\s*[:：]\s+/, '')) + '</dd>\n';
+        i++;
+        if (i < n && !isBlank(lines[i]) && !/^\s*[:：]\s+/.test(lines[i])) term = lines[i++]; else break;
+      }
+      out.push(dl + '</dl>\n'); continue;
+    }
+
+    /* 脚注定义 */
+    var fdm = /^\[\^([^\]]+)\]:\s*(.*)$/.exec(line);
+    if (fdm) {
+      var fb = [fdm[2]];
+      i++;
+      while (i < n && !isBlank(lines[i]) && /^\s{2,}/.test(lines[i])) { fb.push(lines[i].trim()); i++; }
+      footnotes.push({ key: fdm[1], text: fb.join(' ') });
+      continue;
+    }
+
+    /* 列表 */
+    if (/^\s*([-*+]|\d+[.)])\s+/.test(line)) {
+      var res = parseList(lines, i);
+      out.push(res.html); i = res.next; continue;
+    }
+
+    /* 分离式折叠块的内容区：[标识符]~>[ … ]（不在表格 / 列表里时） */
+    var fsb = isFoldContentStart(line);
+    if (fsb) {
+      var rcb = readFoldContent(lines, i, fsb[2]);
+      if (rcb.ok) {                               // 少了收尾的 ] → 落到下面按普通文本处理
+        out.push('<div class="mb-fold-body" data-mb-fold="' + esc(foldId(fsb[1])) + '" hidden>\n'
+                 + parseBlocks(rcb.lines) + '</div>\n');
+        i = rcb.next; continue;
+      }
+    }
+
+    /* 折叠块（块级） */
+    if (/^\s*~\[/.test(line)) {
+      var fo = parseFoldBlock(lines, i);
+      if (fo) { out.push(fo.html); i = fo.next; continue; }
+    }
+
+    /* 单独成行的执行语句：交给 inline 走一遍（它会把 {{a}}{{b}} 规范成 {{a}{b}}） */
+    if (/^\s*\{\{[\s\S]*\}\}\s*$/.test(line.trim())) {
+      out.push('<p>' + inline(line.trim(), { attrs: [] }) + '</p>');
+      i++; continue;
+    }
+    /* 排版调整语句单独成行 */
+    var lay = /^\s*\{\|([^}]*)\|\}\s*$/.exec(line);
+    if (lay) {
+      var code = lay[1];
+      var buf2 = [], j2 = i + 1;
+      while (j2 < n && !isBlank(lines[j2])
+             && !/^\s*(#{1,6}\s|>|~\[|\{\{|\{\||\{[#.]|```|~~~|[-*+]\s|\d+[.)]\s)/.test(lines[j2])) {
+        buf2.push(lines[j2]); j2++;
+      }
+      out.push(layoutWrap(code, buf2.length ? parseBlocks(buf2) : ''));
+      i = j2; continue;
+    }
+
+    /* 段落 */
+    var para = [];
+    while (i < n && !isBlank(lines[i]) && !/^\s*(#{1,6}\s|>|~\[|\{\{|\{\||\{[#.]|\[[A-Za-z0-9_-]+\]~>\[|```|~~~)/.test(lines[i])
+           && !looksLikeTable(lines, i) && !/^\s*([-*+]|\d+[.)])\s+/.test(lines[i])) {
+      para.push(lines[i]); i++;
+    }
+    if (!para.length) { para.push(lines[i]); i++; }
+    /* 行尾的 `\` 接行（3.15 规则 4）；可以跨行的行内语法在 parseBlocks 开头已经接好了（3.16 / 3.19） */
+    para = joinHardLines(para);
+    var pSkip = pendingSkip; pendingSkip = 0;
+    /* 行尾的排版调整语句：修改这一行所属的块 */
+    var pCls = [], lastIdx = para.length - 1;
+    var tl = /^(.*?)\s*\{\|([^}]*)\|\}\s*$/.exec(para[lastIdx]);
+    if (tl) {
+      var lcs = layoutClasses(tl[2]);
+      if (lcs.length) { pCls = lcs; para[lastIdx] = tl[1]; }
+    }
+    var sc = { attrs: [] };
+    var text = para.map(function (l, k) {
+      var hard = /\s\s$/.test(l);
+      return inline(l.replace(/\s+$/, ''), sc, k === 0 ? pSkip : 0)
+           + (hard && k < para.length - 1 ? '<br>' : '');
+    }).join('\n');
+    var pattr = sc.attrs.join('');
+    if (pCls.length) {
+      /* 这一段里【只有一个元素】（例如一张图）时，跟“排版语句单独成行”走同一条路：
+         交给 layoutWrap() 包一层容器——容器上的 height 才能真正作用到元素上 */
+      if (/^\s*(?:<[^>]+>\s*)+$/.test(text)
+          && /mb-(float-right|float-left|block|inline-middle)/.test(pCls.join(' '))) {
+        var wrapped = layoutWrap(tl[2], text);
+        if (pattr) wrapped = injectAttrsRaw(wrapped, pattr);
+        out.push(wrapped);
+        continue;
+      }
+      pattr = /class="/.test(pattr)
+        ? pattr.replace(/class="([^"]*)"/, 'class="$1 ' + pCls.join(' ') + '"')
+        : ' class="' + pCls.join(' ') + '"' + pattr;
+    }
+    out.push('<p' + pattr + '>' + text + '</p>\n');
+  }
+  return out.join('\n');
+}
+
+function layoutClasses(code) {
+  var cls = [];
+  if (/:---:/.test(code)) cls.push('mb-center');
+  else if (/:---/.test(code)) cls.push('mb-left');
+  else if (/---:/.test(code)) cls.push('mb-right');
+  if (/===/.test(code)) cls.push('mb-block');
+  else if (/-\.[\d.]*-/.test(code)) cls.push('mb-inline-middle');
+  else if (/--\./.test(code)) cls.push('mb-float-right');
+  else if (/\.[\d.]*--/.test(code)) cls.push('mb-float-left');
+  return cls;
+}
+function layoutWrap(code, inner) {
+  var cls = layoutClasses(code);
+  if (!cls.length) return inner;
+  // 内容只有一个元素（例如一张图）时，把外面的 <p> 去掉：
+  // 与 3.9.4 的示例一致（示例里就是光秃秃的 <img>），也让容器上的 height 能直接作用到里面的元素
+  var lone = /^\s*<p(?:\s[^>]*)?>((?:\s*<[^>]+>)+\s*)<\/p>\s*$/.exec(inner);
+  if (lone) inner = lone[1];
+  var nm = /\.(\d+(?:\.\d+)?)/.exec(code);
+  var style = (nm && cls.some(function (c) { return /float|inline-middle/.test(c); }))
+    ? ' style="height: ' + nm[1] + 'em; max-height: 75vh"' : '';
+  return '<div class="' + cls.join(' ') + '"' + style + '">\n' + inner + '</div>\n';
+}
+
+function parseFoldBlock(lines, i) {
+  var line = lines[i], start = line.indexOf('~[');
+  /* 单行形式 ~[标题][正文] / ~[标题]:[正文] / ~[标题][正文][收起] */
+  var one = scanFold(line, start);
+  if (one && !/\S/.test(line.slice(one.end))) {
+    return {
+      html: foldHtml(one.title, parseBlocks(one.body.split('\n')), one.close, one.open, true),
+      next: i + 1
+    };
+  }
+  /* 多行形式：到“以 ] 开头的那一行”为止 */
+  var t = pair(line, start, '~[', ']');
+  if (!t) return null;
+  var rest = line.slice(t.end), open = false;
+  if (rest[0] === ':') { open = true; rest = rest.slice(1); }
+  var body = [], j = i + 1;
+  if (rest.trim() !== '') {
+    var lb = pair(rest, rest.indexOf('['), '[', ']');
+    if (lb) body.push(lb.inner);
+  }
+  var endMark = null;
+  while (j < lines.length) {
+    if (/^\s*\]/.test(lines[j])) { endMark = lines[j]; j++; break; }
+    body.push(lines[j]); j++;
+  }
+  var closeText;
+  if (endMark) {
+    var cm = /^\s*\]\s*\[([\s\S]*)\]\s*$/.exec(endMark);
+    closeText = cm ? cm[1] : '';
+  }
+  return {
+    html: foldHtml(t.inner, parseBlocks(body), closeText, open, true),
+    next: j
+  };
+}
+
+function parseList(lines, i) {
+  var ordered = /^\s*\d+[.)]\s+/.test(lines[i]);
+  var baseIndent = lines[i].match(/^\s*/)[0].length;
+  var ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+  var items = [];
+  while (i < lines.length) {
+    var L = lines[i];
+    /* 分离式折叠块的内容区：吸进列表，折叠时隐藏对应的 <li> */
+    var fs = isFoldContentStart(L, true);       // 宽松：免得把列表切断
+    var rc = fs ? readFoldContent(lines, i, fs[2]) : null;
+    var listish = rc && rc.lines.some(function (ln) { return ITEM.test(ln); });
+    if (rc && rc.ok && listish) {
+      var fidL = foldId(fs[1]);
+      var matchedL = !!FOLD_IDS[fs[1]];
+      rc.lines.forEach(function (ln) {
+        var mI = ITEM.exec(ln);
+        if (mI) items.push({ content: [mI[3]], fid: matchedL ? fidL : null });
+      });
+      i = rc.next; continue;
+    }
+    var mm = ITEM.exec(L);
+    if (!mm) break;
+    var indent = mm[1].length;
+    if (indent !== baseIndent) break;            // 缩进不同 → 交给内层或结束
+    var content = [mm[3]];
+    i++;
+    // 收集该项的后续行（缩进的续行 / 嵌套列表）
+    while (i < lines.length) {
+      var L2 = lines[i];
+      if (isBlank(L2)) {
+        if (i + 1 < lines.length && /^\s{2,}\S/.test(lines[i + 1])) { content.push(''); i++; continue; }
+        break;
+      }
+      var ind2 = L2.match(/^\s*/)[0].length;
+      if (ind2 > baseIndent) { content.push(L2.slice(Math.min(ind2, baseIndent + 2))); i++; continue; }
+      break;
+    }
+    items.push({ content: joinHardLines(content), fid: null });
+    if (i < lines.length && isBlank(lines[i])) {
+      var k = i + 1;
+      while (k < lines.length && isBlank(lines[k])) k++;
+      if (k < lines.length) {
+        var m2 = ITEM.exec(lines[k]);
+        if (m2 && m2[1].length === baseIndent) { i = k; continue; }
+      }
+      i = k - 1; break;
+    }
+  }
+  var tag = ordered ? 'ol' : 'ul';
+  var h = '<' + tag + '>\n';
+  items.forEach(function (it) {
+    var content = it.content, first = content[0], box = '';
+    var cm = /^\[([ xX])\]\s+([\s\S]*)$/.exec(first);
+    if (cm) { box = '<input type="checkbox" disabled' + (cm[1] !== ' ' ? ' checked' : '') + '> '; first = cm[2]; }
+    var rest = content.slice(1);
+    var lsc = { attrs: [] };          // 列表项末尾的命名语句 / aria-label 作用于这个 <li>
+    var inner = inline(first, lsc);
+    h += '<li' + (it.fid ? ' data-mb-fold="' + esc(it.fid) + '" hidden' : '')
+       + lsc.attrs.join('') + '>' + box + inner;
+    if (rest.length) {
+      var sub = parseBlocks(rest);
+      h += (sub.indexOf('<p>') === 0 ? '' : '\n') + sub;
+    }
+    h += '</li>\n';
+  });
+  return { html: h + '</' + tag + '>\n', next: i };
+}
+
+/* ==================================================================
+   5b. 引用其他 mbmd 文件：{{quote:"地址[范围]"}}（见标准 3.24）
+
+   单独成行、且这一行只有这一条 quote 语句时，在【编译期】把内容取回来直接拼接——
+   这样引用的内容会被完整解析（标题、表格、列表、功能语句都算）。
+   写在别处（按钮 / 输入框 / 触发器里、或和别的语句同一组）的 quote 留给运行时，
+   那时插入的文本只按行内语法解析。
+   ================================================================== */
+var QUOTE_CACHE = Object.create(null);          // url → Promise<string>
+function fetchQuoteText(url) {
+  if (!QUOTE_CACHE[url]) {
+    QUOTE_CACHE[url] = fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    });
+  }
+  return QUOTE_CACHE[url];
+}
+/* 把 "地址[范围]" 拆成地址与范围（范围可以省略） */
+function splitQuoteArg(arg) {
+  var m = /^([\s\S]*?)\s*\[([\s\S]*)\]\s*$/.exec(String(arg));
+  if (!m) return { url: String(arg).trim(), spec: '' };
+  return { url: m[1].trim(), spec: m[2] };
+}
+function resolveQuotes(src) {
+  var text = src.replace(/\r\n?/g, '\n');
+  var lines = text.split('\n'), jobs = [], i;
+  for (i = 0; i < lines.length; i++) {
+    var m = /^[ \t]*\{\{\s*quote\s*:\s*("(?:[^"\\]|\\.)*")\s*\}\}[ \t]*$/.exec(lines[i]);
+    if (m) jobs.push({ idx: i, arg: m[1] });
+  }
+  if (!jobs.length) return Promise.resolve(text);
+  QUOTE_LOG.length = 0;
+  return Promise.all(jobs.map(function (job) {
+    var arg = null;
+    try { arg = JSON.parse(job.arg); } catch (e) { arg = null; }
+    if (arg === null) { QUOTE_LOG.push('⚠ quote：地址不是一个合法字符串：' + job.arg); return null; }
+    var q = splitQuoteArg(arg);
+    return fetchQuoteText(q.url).then(function (txt) {
+      job.text = MB_cut(txt, q.spec);
+      QUOTE_LOG.push('⚠ quote：已引用「' + q.url + (q.spec ? '[' + q.spec + ']' : '')
+                     + '」（' + job.text.split('\n').length + ' 行）');
+    }, function (e) {
+      QUOTE_LOG.push('⚠ quote：取不到「' + q.url + '」（' + e.message + '）——保留原语句，交给运行时再试');
+    });
+  })).then(function () {
+    return lines.map(function (ln, idx) {
+      for (var k = 0; k < jobs.length; k++) {
+        if (jobs[k].idx === idx && jobs[k].text != null) return jobs[k].text;
+      }
+      return ln;
+    }).join('\n');
+  });
+}
+
+/* ==================================================================
+   6. 编译入口
+   ================================================================== */
+var footnotes = [];
+function compile(src) {
+  warnings = []; footnotes = [];
+  tickClock();
+  var lines = src.replace(/\r\n?/g, '\n').split('\n');
+  collectFoldIds(src);
+  // 折叠块的写法检查：给出明确的报错提示，而不是悄悄把表格切断
+  lines.forEach(function (ln) {
+    var head = RE_FOLD_HEAD.exec(ln);
+    if (head && !FOLD_IDS[head[1].trim()]) {
+      warn('发现折叠内容区 `[' + head[1].trim() + ']~>[`，但没有找到对应的按钮 `~[标题]~>['
+         + head[1].trim() + ']`——两处的标识符必须完全一样');
+    }
+    var noTilde = /\[([^\]\n]+?)\]\s*[~～]\s*[>＞]\s*\[([^\]\n]+?)\]/.exec(ln);
+    if (noTilde) {
+      var before = ln.charAt(noTilde.index - 1);
+      if (before !== '~' && before !== '～' && !FOLD_IDS[noTilde[2].trim()]) {
+        warn('`' + noTilde[0] + '` 看起来像折叠按钮，但少了开头的 `~`——按钮写成 `~[标题]~>[标识符]`，'
+           + '`~` 不能省略，现在这里按普通文本输出');
+      }
+    }
+    /* 命名语句要写在元素【后面】（见标准 3.1）。写在前面是旧写法，提示一下 */
+    if (/^\s*\{[#.][^}]*\}\s*\S/.test(ln)) {
+      warn('命名语句写在了元素前面：应写成「元素 {#id}」（见 3.1）——`' + ln.trim().slice(0, 24)
+         + '` 现在仍按旧写法作用到本块上');
+    }
+  });
+  // 首行版本/语言声明
+  if (lines.length && /^\s*\{\{v:[^}]*\}/.test(lines[0])) lines.shift();
+  var html = parseBlocks(lines);
+  if (footnotes.length) {
+    html += '\n<section class="mb-footnotes">\n<ol>\n' + footnotes.map(function (f) {
+      return '<li id="fn-' + esc(f.key) + '">' + inline(f.text) + '</li>';
+    }).join('\n') + '\n</ol>\n</section>\n';
+  }
+  return html;
+}
+/* 有公式时，生成的文档里带上 KaTeX（现成的实现）；没加载到就按原文显示 */
+var KATEX_CSS = 'https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css';
+var KATEX_JS = 'https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js';
+function fullHtml(body, title, needCompiler) {
+  var math = /data-mb-tex="/.test(body) || needCompiler;   // 运行时也可能插入公式
+  var compiler = '';
+  if (needCompiler && COMPILER_SRC) {
+    compiler = '<script>\n(function () {\n' + COMPILER_SRC
+             + '\nwindow.mbCompile = compile;   // 运行时解析引用时用\n})();\n<\/script>\n';
+  }
+  return '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n'
+       + '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+       + '<title>' + esc(title || 'MarkBottom 文档') + '</title>\n'
+       + (math ? '<link rel="stylesheet" href="' + KATEX_CSS + '" crossorigin="anonymous">\n'
+               + '<script src="' + KATEX_JS + '" crossorigin="anonymous"><\/script>\n' : '')
+       + '<style>\n'
+       + document.getElementById('stdCss').textContent.trim() + '\n</style>\n'
+       + '</head>\n<body class="mb-doc">\n' + body
+       + '\n<script>\n' + document.getElementById('mbRange').textContent.trim() + '\n'
+       + document.getElementById('stdJs').textContent.trim() + '\n<\/script>\n'
+       + compiler
+       + '</body>\n</html>\n';
+}
+
+
+window.mbCompile = compile;   // 运行时解析引用时用
 })();
 </script>
 </body>
